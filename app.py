@@ -505,6 +505,48 @@ def cancel_job(job_id):
     return jsonify({"ok": True, "status": "canceling"})
 
 
+@app.route("/rerun/<job_id>", methods=["POST"])
+def rerun_job(job_id):
+    """Create a new job using the same parameters as an existing job.
+
+    Useful for re-running a completed, failed, or canceled job without having
+    to navigate back to the home page and manually re-fill the form.
+    The original job is left untouched.
+    """
+    with jobs_lock:
+        source = jobs.get(job_id)
+    if not source:
+        abort(404)
+
+    params = dict(source["params"])
+    new_job_id = uuid4().hex[:8]
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_name = params.get("output_name", "web_run")
+    output_prefix = f"{output_name}_{timestamp}_{new_job_id}"
+
+    job_data = {
+        "id": new_job_id,
+        "status": "queued",
+        "params": params,
+        "output_prefix": output_prefix,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "scrape_log": "",
+        "handle_log": "",
+        "certs": [],
+        "error": "",
+        "canceled": False,
+    }
+
+    with jobs_lock:
+        jobs[new_job_id] = job_data
+        _save_job(job_data)
+
+    thread = threading.Thread(target=_run_pipeline, args=(new_job_id,), daemon=True)
+    thread.start()
+
+    return redirect(url_for("job_page", job_id=new_job_id))
+
+
 @app.route("/delete/<job_id>", methods=["POST"])
 def delete_job(job_id):
     """Remove a job from memory, the database, and its CSV output files.
