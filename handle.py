@@ -34,7 +34,8 @@ d = {}
 # set strings and count occurrences across all jobs.
 with open(f'{filename}', 'r') as f:
 	lines = f.readlines()
-	pattern = r"'([A-Za-z0-9_\./\\-]*)'"
+	# Include '+' so cert names like SECURITY+ and NETWORK+ are counted.
+	pattern = r"'([A-Za-z0-9_\./\\\-+]+)'"
 	for line in lines:
 		m = re.findall(pattern, line)
 		if len(m) > 0:
