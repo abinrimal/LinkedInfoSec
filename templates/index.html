@@ -128,6 +128,12 @@
 
     <div class="card">
       <h2>All Jobs</h2>
+      <p>
+        <form method="post" action="/clear-completed" style="display:inline"
+          onsubmit="return confirm('Delete all completed, failed, and canceled jobs?\nThis cannot be undone.')">
+          <button type="submit" style="background:#666">Clear Completed Jobs</button>
+        </form>
+      </p>
       <div class="toolbar">
         <div>
           <label for="job-search">Search by ID, status, job, location, output</label>

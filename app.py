@@ -368,6 +368,27 @@ def _parse_allinfo_rows(job, max_rows=400):
     return rows
 
 
+@app.route("/clear-completed", methods=["POST"])
+def clear_completed():
+    """Delete all completed, failed, and canceled jobs from memory and database."""
+    with jobs_lock:
+        to_delete = [
+            jid for jid, j in jobs.items()
+            if j["status"] in {"completed", "failed", "canceled"}
+        ]
+        for jid in to_delete:
+            _delete_job_files(jobs[jid])
+            del jobs[jid]
+    
+    with _db_conn() as conn:
+        conn.execute(
+            "DELETE FROM jobs WHERE status IN ('completed', 'failed', 'canceled')"
+        )
+        conn.commit()
+    
+    return redirect(url_for("index"))
+
+
 @app.route("/")
 def index():
     """Home page: scrape form + all-jobs table."""
