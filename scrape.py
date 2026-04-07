@@ -1,11 +1,32 @@
 #!/usr/bin/env python3
+"""
+LinkedInfoSec – scrape.py
+=========================
+Scrapes LinkedIn's public job search results for InfoSec-related job postings
+and extracts certification requirements from each listing.
+
+For each job it:
+  1. Collects card-level metadata (ID, title, location, age) via Selenium.
+  2. Fetches the public job page over HTTP and parses the description for
+     certification keywords.
+  3. Records the job description snippet, open date (relative age), and any
+     application close date mentioned in the listing text.
+  4. Writes per-job rows to *_allinfo.csv and per-cert rows to *_data.csv.
+  5. Produces *_all_certs.csv with a ranked count of every cert seen.
+
+Original project by ahessmat: https://github.com/ahessmat/LinkedInfoSec
+Extended with multi-browser support, web UI integration, macOS compatibility
+fixes, description/date extraction, and stale-element resilience.
+"""
 
 from selenium import webdriver
-from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.chrome.service import Service as ChromeService
 #from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
 import requests
 import time
 import pandas as pd
@@ -13,6 +34,10 @@ import re	#needed for regex calls
 from tqdm import tqdm	#needed for loading bar on CLI
 import argparse	#needed for parsing commandline arguments
 import csv	#for writing to file
+import html as html_lib
+from pathlib import Path
+import os
+import platform
 
 #Helper functions
 
@@ -37,22 +62,31 @@ def restricted_float(x):
 		raise argparse.ArgumentTypeError("%r not a floating-point literal" % (x,))
 	return x
 
-def write_results_to_file(filename, j_id, j_title, j_certs):
-	with open(f'{filename}_allinfo.csv', 'a+') as f:
-		#writer = csv.DictWriter(f, fieldnames = header)
-		#writer.writeheader()
-		#writer.writerow({'job_id': j_id, 'job_title' : j_title, 'certifications' : j_certs})
-		f.write(f'{j_id[0]},{j_title[0]},{j_certs}\n')
+def write_results_to_file(filename, j_id, j_title, j_certs, j_desc="", j_open_date="", j_close_date=""):
+	"""Append one row to *_allinfo.csv.
+
+	Columns: job_id, title, certs_set, description, open_date, close_date.
+	Using csv.writer ensures values with commas or newlines are quoted properly.
+	"""
+	with open(f'{filename}_allinfo.csv', 'a+', newline='') as f:
+		writer = csv.writer(f)
+		writer.writerow([j_id[0], j_title[0], str(j_certs), j_desc, j_open_date, j_close_date])
 
 def write_csv(filename, j_id, j_title, cert):
+	"""Append one flat (job_id, title, cert) row to *_data.csv.
+
+	This file has one row per cert per job, making it easy to pivot or filter
+	in Excel / pandas without expanding sets.
+	"""
 	with open(f'{filename}_data.csv', 'a+') as f:
-		#writer = csv.DictWriter(f, fieldnames = header)
-		#writer.writeheader()
-		#writer.writerow({'job_id': j_id, 'job_title' : j_title, 'certifications' : j_certs})
 		f.write(f'{j_id},{j_title},{cert}\n')
 		
 def store_dict(filename, dic):
-	csv_cols = ['certification','count']
+	"""Write a certification-count dict to *_certs.csv.
+
+	Called twice: once at the 50-job checkpoint and once at the end, so you get
+	an early snapshot and the full ranked list.
+	"""
 	with open(f'{filename}_certs.csv', 'a+') as f:
 		for key in dic.keys():
 			f.write("%s,%s\n"%(key,dic[key]))
@@ -69,6 +103,8 @@ argp.add_argument("-o", "--output", help="The name of the file to output scrape 
 argp.add_argument("-q", "--quick", help="Only parse the first 100 results", action='store_true')
 argp.add_argument("-k", "--keywords", help="A list of keywords to more narrowly filter LinkedIn's search results; excludes any job titles that do NOT have any of the listed keywords", default="")
 argp.add_argument("--max", help="The maximum number of jobs that should be processed", type=int)
+argp.add_argument("-b", "--browser", choices=['firefox', 'chrome'], help="Browser to run Selenium with", default="firefox")
+argp.add_argument("--keep-open", help="Keep browser open after script completes", action='store_true')
 
 
 
@@ -98,6 +134,16 @@ IWhite="\033[0;97m"       # White
 
 cert_dic = {}
 
+# Well-known InfoSec cert names used as a regex-independent fallback.
+# When the cert keyword regex misses an acronym (e.g. because the
+# surrounding text lacks a "certification" trigger word), we do a plain
+# uppercase string search against these known names as a safety net.
+common_certs = [
+	"CISSP", "CISM", "CISA", "CEH", "OSCP", "OSCE", "OSWP", "SECURITY+", "NETWORK+",
+	"CASP+", "PENTEST+", "CCSP", "SSCP", "GSEC", "GPEN", "GWAPT", "CRISC", "GIAC",
+	"AZ-500", "SC-200", "SC-300", "SC-100", "AWS SECURITY SPECIALTY", "CCNA", "CCNP"
+]
+
 
 try:
 	#keyword 'cybersecurity' located 'remote'
@@ -115,8 +161,31 @@ try:
 	#ffoptions.add_argument("--headless")
 	#wd = webdriver.Firefox(executable_path='/home/kali/LinkedInfoSec/geckodriver')
 	#wd = webdriver.Firefox(firefox_options=ffoptions)
-	service = Service(executable_path='/snap/bin/firefox.geckodriver')
-	wd = webdriver.Firefox(service=service)
+	# --- Browser initialisation ---
+	# Selenium Manager (bundled with selenium>=4.6) auto-downloads the matching
+	# driver when no local binary is provided, so we only use the bundled
+	# geckodriver if it is actually executable on this platform.
+	if parsed.browser == 'firefox':
+		local_driver = Path(__file__).resolve().parent / 'geckodriver'
+		use_local_driver = local_driver.exists() and os.access(local_driver, os.X_OK)
+
+		# macOS cannot execute Linux ELF binaries; skip the bundled driver in that case.
+		if use_local_driver and platform.system() == 'Darwin':
+			with open(local_driver, 'rb') as driver_file:
+				is_elf = driver_file.read(4) == b'\x7fELF'
+			if is_elf:
+				use_local_driver = False
+
+		service = FirefoxService(executable_path=str(local_driver)) if use_local_driver else FirefoxService()
+		wd = webdriver.Firefox(service=service)
+	else:
+		chrome_options = webdriver.ChromeOptions()
+		# detach=True keeps the Chrome window open after the script exits,
+		# useful for inspecting the final page state.
+		if parsed.keep_open:
+			chrome_options.add_experimental_option("detach", True)
+		service = ChromeService()
+		wd = webdriver.Chrome(service=service, options=chrome_options)
 
 	#Getting cyber-related jobs
 	wd.get(cyber_url)
@@ -136,28 +205,20 @@ try:
 		exit()
 	"""
 	
-	#scroll through jobs listings
-	jobs_iteration = 0
-	if parsed.quick:
-		jobs_iteration = 1
-	else:
-		jobs_iteration = (no_cyberjobs//25)+1
+	# --- Scroll-to-load: force all job cards into the DOM ---
+	# LinkedIn renders listings lazily in batches of 25. We scroll to the bottom
+	# on each iteration and click "See more jobs" when it appears. In quick mode
+	# we only do one scroll pass (≈100 results).
+	jobs_iteration = 1 if parsed.quick else (no_cyberjobs // 25) + 1
 	for i in tqdm(range(jobs_iteration)):
 		wd.execute_script('window.scrollTo(0,document.body.scrollHeight);')
-		#if parsed.quick and i > 2:
-		#	break
-		#i = i + 1
 		try:
-			#Looking for the "See More Jobs" button that eventually appears when scrolling through job listings
+			# Click the "See More Jobs" button when it becomes visible.
 			found = len(wd.find_elements(By.CLASS_NAME, 'infinite-scroller__show-more-button--visible'))
 			if found > 0:
-				#time.sleep(1)
 				wd.find_element(By.CLASS_NAME, 'infinite-scroller__show-more-button--visible').click()
-				#time.sleep(0.5)
 			else:
 				time.sleep(1)
-				#WebDriverWait(wd, 5).until(EC.element_to_be_clickable((By.XPATH, "By.CLASS_NAME, 'infinite-scroller__show-more-button--visible'")))
-				
 		except:
 			time.sleep(1)
 			pass
@@ -184,8 +245,23 @@ try:
 	#TODO, fix tqdm to reflect -q option
 	#TODO, implement interrupt function to allow user to change speed of jobs processing on-the-fly
 	
-	#Enumerating jobs
-	for job in tqdm(jobs):
+	# --- Per-job processing loop ---
+	# LinkedIn's DOM can refresh mid-iteration (e.g. when a card is lazily
+	# rendered or the sidebar updates), invalidating previously held element
+	# references. To avoid StaleElementReferenceException we re-fetch the full
+	# list on every iteration rather than holding onto a stale list of elements.
+	for idx in tqdm(range(len(jobs))):
+		try:
+			job_list = wd.find_element(By.CLASS_NAME, 'jobs-search__results-list')
+			job_rows = job_list.find_elements(By.TAG_NAME, 'li')
+			if idx >= len(job_rows):
+				failed_jobs += 1
+				continue
+			job = job_rows[idx]
+		except (StaleElementReferenceException, NoSuchElementException):
+			failed_jobs += 1
+			continue
+
 		#print(IWhite + f"\n[+] Now listing JOBID: {job_id}, {job_title}:")
 		
 		#Pulling information from the job description by clicking through each job
@@ -223,40 +299,46 @@ try:
 				job_num += 1
 				continue"""
 		#print("IT WORKED")
-		j_id = job.find_element(By.CLASS_NAME, 'job-search-card').get_attribute('data-entity-urn')
-		j_id = str(j_id).replace('urn:li:jobPosting:','')
-		j_title = job.find_element(By.CLASS_NAME, 'base-search-card__title').get_attribute('innerText')
-		j_location = job.find_element(By.CLASS_NAME, 'job-search-card__location').get_attribute('innerText')
-		j_age = job.find_element(By.TAG_NAME, 'time').get_attribute('innerText')
+		try:
+			j_id = job.find_element(By.CLASS_NAME, 'job-search-card').get_attribute('data-entity-urn')
+			j_id = str(j_id).replace('urn:li:jobPosting:','')
+			j_title = job.find_element(By.CLASS_NAME, 'base-search-card__title').get_attribute('innerText')
+			j_location = job.find_element(By.CLASS_NAME, 'job-search-card__location').get_attribute('innerText')
+			j_age = job.find_element(By.TAG_NAME, 'time').get_attribute('innerText')
+		except (StaleElementReferenceException, NoSuchElementException):
+			failed_jobs += 1
+			continue
 		job_id.append(j_id)
 		job_title.append(j_title)
 		job_location.append(j_location)
 		job_age.append(j_age)
 		job_num = job_num + 1
 
+		# Apply keyword filter (-k flag): skip any job whose title contains none
+		# of the required keywords. Useful to narrow broad searches like
+		# "cybersecurity" down to "SOC analyst" or "cloud security" etc.
 		if len(filterwords) > 0:
 			t_title = j_title.lower()
-			isGood = False
-			for kword in filterwords:
-				if kword in t_title:
-					isGood = True
+			isGood = any(kword in t_title for kword in filterwords)
 			if not isGood:
 				continue
 		#job_desc_block = "/html/body/div[1]/div/section/div[2]/div[1]/section[1]/div/div[2]/section/div"
 		#print(job_num,j_id,j_title,j_age)
-		
+		j_desc = ""
+		j_open_date = j_age
+		j_close_date = ""		
 		#This is the XPATH to the descriptive text
 		job_desc_block = "/html/body/div[1]/div/section/div[2]/div/section[1]/div/div/section/div"
 		#job_desc_block = "/html/body/div[1]/div/section/div[2]/div/section[2]/div/div/section/div"
 				
-		#Sometimes the script doesn't sleep long enough for text to load; we don't want to preemptively terminate the script, so this is a check to see if it's loaded.
+		# Sometimes LinkedIn doesn't render the right detail pane in time.
+		# Keep going and parse the public job page directly instead of skipping the job.
 		found = len(wd.find_elements(By.XPATH, job_desc_block))
 		if found > 0:
 			jd_block = wd.find_element(By.XPATH, job_desc_block).get_attribute('innerHTML')
 			#print(jd_block)
 		else:
 			failed_jobs += 1
-			continue
 		
 		keywords = ["certification", "certifications", "certs", "Certification", "Certifications", "Certs", "accreditations", "accreditation", "Certification(s)", "certification(s)"]
 		jd_certs = set()
@@ -267,23 +349,52 @@ try:
 		j_url = "https://www.linkedin.com/jobs/view/" + j_id
 
 		# Send a GET request to the URL
-		response = requests.get(j_url)
+		headers = {
+			"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+		}
+		response = requests.get(j_url, headers=headers, timeout=20)
 		foundcert = False
 
 		# Check if the request was successful (status code 200)
 		if response.status_code == 200:
+			page_text = response.text
+			page_text_upper = page_text.upper()
+
+			# --- Extract description from the HTML markup section ---
+			desc_m = re.search(
+				r'class="show-more-less-html__markup[^"]*"[^>]*>(.*?)</div>',
+				page_text, re.DOTALL | re.I
+			)
+			if desc_m:
+				raw_desc = desc_m.group(1)
+				clean = re.sub(r'<[^>]+>', ' ', raw_desc)
+				clean = html_lib.unescape(clean)
+				clean = re.sub(r'\s+', ' ', clean).strip()
+				j_desc = clean[:500]
+
+			# --- Try to find a close/deadline date in the description or page text ---
+			# LinkedIn doesn't expose deadlines in structured data; some employers include them in text.
+			close_m = re.search(
+				r'(?:clos(?:ing|es?)\s+(?:date|on)?|apply\s+(?:by|before)|application\s+(?:deadline|due)|'
+				r'deadline[:\s])[\s:]*([A-Za-z][\w,\s]{3,30}?\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+				j_desc + " " + page_text, re.I
+			)
+			if close_m:
+				j_close_date = close_m.group(1).strip()[:50]
+
 			# Print the response content (the web page HTML, for example)
 			#print(response.text)
 
 			# Define the keywords you want to search for
 			keywords = ["certification", "certifications", "certs", "Certification", "Certifications", "Certs", "accreditations", "accreditation", "Certification(s)", "certification(s)"]
 
-			# Regular expression pattern to match any of the keywords
+			# Build a pattern that matches lines mentioning cert-related words.
 			keyword_pattern = "|".join(re.escape(keyword) for keyword in keywords)
-			pattern = re.compile(keyword_pattern, re.I)  # 're.I' for case-insensitive matching
+			pattern = re.compile(keyword_pattern, re.I)
 
-			# Regular expression pattern to match words with "+" or at least 2 consecutive uppercase letters
-			#word_pattern = re.compile(r"\b(?:[A-Z]{2,}|\w+\+\w+\d+|\w+-\d+)(?![A-Z-])")
+			# Pattern to extract cert-like tokens: hyphenated uppercase codes
+			# (AZ-500, SC-200), acronyms with '+' (SECURITY+, CASP+), or tokens
+			# ending in 2+ uppercase letters (e.g. wordCISSP).
 			word_pattern = re.compile(r"[A-Z]+\-+[\w]+|[a-zA-Z]+\+|[\w]+[A-Z]{2,}")
 
 			
@@ -300,6 +411,13 @@ try:
 						for cred in set(matching_words):
 							write_csv(parsed.output, j_id, j_title, cred)
 						jd_certs.update(matching_words)
+
+			# Fallback: match commonly requested cert names directly from full page text.
+			for cert_name in common_certs:
+				if cert_name in page_text_upper:
+					foundcert = True
+					jd_certs.add(cert_name)
+					write_csv(parsed.output, j_id, j_title, cert_name)
 		else:
 			#print(f"Failed to retrieve the page. Status code: {response.status_code}")
 			pass
@@ -316,7 +434,7 @@ try:
 		
 		
 		job_tracker += 1
-		write_results_to_file(parsed.output, [j_id], [j_title], jd_certs)
+		write_results_to_file(parsed.output, [j_id], [j_title], jd_certs, j_desc, j_open_date, j_close_date)
 		
 		for cert in jd_certs:
 			if cert in cert_dic:
@@ -331,7 +449,7 @@ try:
 
 	#wd.find_element(By.CLASS_NAME, 'jobs-search__results-list')
 	#print(job_id)
-	print(IRed + f"[-] A total of {failed_jobs} jobs failed to load while scraping, consider slowing the rate of processing with the -i flag")
+	print(IYellow + f"[-] Job detail pane failed to render for {failed_jobs} listings; HTTP parsing fallback was still used.")
 	print(IGreen + f"[+] A total of {no_certs} jobs did not have any certs found")
 	print(IGreen + f"[+] A total of {yes_certs} jobs did have certs listed")
 	
@@ -349,7 +467,8 @@ except KeyboardInterrupt:
 		print(f"{k} : {v}")
 	
 finally:
-	try:
-		wd.close()
-	except:
-		pass
+	if not parsed.keep_open:
+		try:
+			wd.quit()
+		except:
+			pass

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job {{ job.id }}</title>
+  <style>
+    body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
+    .wrap { max-width: 980px; margin: 40px auto; padding: 0 20px; }
+    .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+    .status { font-weight: bold; }
+    pre { background: #f3efe8; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+    .toggle-btn { background: none; border: 1px solid #c8bca9; border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 13px; color: #005f73; margin-bottom: 8px; }
+    .collapsible { display: none; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 10px; border-bottom: 1px solid #ece6dd; text-align: left; }
+    a { color: #005f73; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <p><a href="/">Back</a></p>
+      <h1>Job {{ job.id }}</h1>
+      <p>Output prefix: <span id="output-prefix">{{ job.output_prefix }}</span></p>
+      <p>Status: <span id="status" class="status">{{ job.status }}</span></p>
+      <p id="error"></p>
+      <p>
+        <button id="cancel-btn" type="button">Cancel Job</button>
+      </p>
+      <p>
+        <a href="/download/{{ job.id }}/allinfo">Download allinfo CSV</a> |
+        <a href="/download/{{ job.id }}/data">Download data CSV</a> |
+        <a href="/download/{{ job.id }}/allcerts">Download all certs CSV</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Top Certifications <button class="toggle-btn" onclick="toggleSection('certs-wrap', this)">Show</button></h2>
+      <div id="certs-wrap" class="collapsible">
+        <table>
+          <thead><tr><th>Certification</th><th>Count</th></tr></thead>
+          <tbody id="certs-body">
+            {% for cert in job.certs %}
+            <tr><td>{{ cert[0] }}</td><td>{{ cert[1] }}</td></tr>
+            {% else %}
+            <tr><td colspan="2">No results yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Scraped Jobs</h2>
+      <table>
+        <thead><tr><th>LinkedIn Job ID</th><th>Title</th><th>Open Date</th><th>Close Date</th><th>Certs</th><th>Description</th></tr></thead>
+        <tbody id="jobs-body">
+          {% for row in job.scraped_jobs %}
+          <tr>
+            <td><a href="https://www.linkedin.com/jobs/view/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">{{ row.job_id }}</a></td>
+            <td>{{ row.title }}</td>
+            <td>{{ row.open_date }}</td>
+            <td>{{ row.close_date }}</td>
+            <td>{{ row.certs }}</td>
+            <td title="{{ row.description }}">{{ row.description[:150] }}{% if row.description|length > 150 %}…{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6">No scraped jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Scrape Log <button class="toggle-btn" onclick="toggleSection('scrape-log-wrap', this)">Show</button></h2>
+      <div id="scrape-log-wrap" class="collapsible">
+        <pre id="scrape-log">{{ job.scrape_log }}</pre>
+      </div>
+      <h2>Handle Log <button class="toggle-btn" onclick="toggleSection('handle-log-wrap', this)">Show</button></h2>
+      <div id="handle-log-wrap" class="collapsible">
+        <pre id="handle-log">{{ job.handle_log }}</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const jobId = "{{ job.id }}";
+    const statusEl = document.getElementById("status");
+    const errorEl = document.getElementById("error");
+    const scrapeLogEl = document.getElementById("scrape-log");
+    const handleLogEl = document.getElementById("handle-log");
+    const certsBody = document.getElementById("certs-body");
+    const jobsBody = document.getElementById("jobs-body");
+    const cancelBtn = document.getElementById("cancel-btn");
+
+    function toggleSection(id, btn) {
+      const el = document.getElementById(id);
+      const visible = el.style.display === "block";
+      el.style.display = visible ? "none" : "block";
+      btn.textContent = visible ? "Show" : "Hide";
+    }
+
+    cancelBtn.addEventListener("click", async () => {
+      await fetch(`/cancel/${jobId}`, { method: "POST" });
+      setTimeout(refreshJob, 300);
+    });
+
+    function renderCerts(certs) {
+      if (!certs || certs.length === 0) {
+        certsBody.innerHTML = "<tr><td colspan='2'>No certs detected in this run.</td></tr>";
+        return;
+      }
+      certsBody.innerHTML = certs
+        .map((item) => `<tr><td>${item[0]}</td><td>${item[1]}</td></tr>`)
+        .join("");
+    }
+
+    function renderScrapedJobs(rows) {
+      if (!rows || rows.length === 0) {
+        jobsBody.innerHTML = "<tr><td colspan='6'>No scraped jobs yet.</td></tr>";
+        return;
+      }
+      jobsBody.innerHTML = rows
+        .map((r) => {
+          const desc = r.description || "";
+          const shortDesc = desc.length > 150 ? desc.slice(0, 150) + "\u2026" : desc;
+          const escapedDesc = desc.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const escapedShort = shortDesc.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          return `<tr>
+            <td><a href="https://www.linkedin.com/jobs/view/${r.job_id}" target="_blank" rel="noopener noreferrer">${r.job_id}</a></td>
+            <td>${r.title || ""}</td>
+            <td>${r.open_date || ""}</td>
+            <td>${r.close_date || ""}</td>
+            <td>${r.certs || ""}</td>
+            <td title="${escapedDesc}">${escapedShort}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    async function refreshJob() {
+      const res = await fetch(`/api/job/${jobId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      statusEl.textContent = data.status;
+      errorEl.textContent = data.error ? `Error: ${data.error}` : "";
+      scrapeLogEl.textContent = data.scrape_log || "";
+      handleLogEl.textContent = data.handle_log || "";
+      renderCerts(data.certs);
+      renderScrapedJobs(data.scraped_jobs);
+
+      if (data.status === "completed" || data.status === "failed" || data.status === "canceled") {
+        cancelBtn.disabled = true;
+      }
+
+      if (data.status === "completed" || data.status === "failed" || data.status === "canceled") {
+        return;
+      }
+      setTimeout(refreshJob, 2000);
+    }
+
+    setTimeout(refreshJob, 1000);
+  </script>
+</body>
+</html>

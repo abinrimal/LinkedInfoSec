@@ -1,12 +1,49 @@
 # LinkedInfoSec README
 
+> **Based on the original project by [@ahessmat](https://github.com/ahessmat)**
+> Original repository: [https://github.com/ahessmat/LinkedInfoSec](https://github.com/ahessmat/LinkedInfoSec)
+>
+> This fork extends the original CLI scraper with macOS compatibility fixes,
+> Chrome browser support, a Flask web UI with persistent job history, CSV downloads,
+> cancel/edit/delete, and enriched per-job output (description, open date, close date).
+
 The LinkedInfoSec project was born from the desire to identify exactly which certifications prospective employers are looking for right now. The tool datascrapes LinkedIn's public-facing job search endpoint for job listings that contain certifications, then outputs .CSV formatted files with all of the information it grabs.
+
+## Quick Start (macOS/Linux)
+
+1. Create and activate a virtual environment:
+
+```bash
+python3 -m venv .env
+source .env/bin/activate
+```
+
+2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Ensure Firefox is installed (required by Selenium).
+
+4. Run a quick scrape:
+
+```bash
+python scrape.py -j "cybersecurity" -l "remote" -q -o cyber
+```
+
+5. Parse extracted cert counts:
+
+```bash
+python handle.py -f cyber_allinfo.csv
+```
 
 The python script requires the following non-standard libraries and their dependencies:
 
 1. selenium
-2. tqdm
-3. argparse
+2. requests
+3. pandas
+4. tqdm
 
 The following flags may be passed to scrape.py to tailor your results:
 
@@ -18,7 +55,56 @@ The following flags may be passed to scrape.py to tailor your results:
 * **-o** or **--output**: The name of the file to output scrape results to. Example **python3 scrape.py -o sec**
 * **-q** or **--quick**: Only parse the first 50 listings. Example **python3 scrape.py -q**
 * **-max**: The maximum number of jobs that should be processed. Example **python3 scrape.py --max 500**
+* **-b** or **--browser**: Browser to run with (`firefox` or `chrome`). Default is `firefox`. Example **python3 scrape.py -b chrome**
+* **--keep-open**: Keep browser open after the script finishes. Useful for debugging page state. Example **python3 scrape.py -b chrome --keep-open**
 
 Regardless of whether you specify a name for the outfile with (-o), the script puts out a .csv file with the results of the scrape, including the given LinkedIn jobID, job title, and the certs (if any) that were found to that post.
 
 You can then output a sorted list of certifications by count by running **handle.py -f <file_allinfo.csv>**.
+
+## Web App (Automated UI)
+
+You can run the project as a local web app where `scrape.py` and `handle.py` run in the background.
+
+1. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Start the web app:
+
+```bash
+python app.py
+```
+
+3. Open your browser at `http://127.0.0.1:5000`.
+
+4. Fill the form and submit. The app will:
+	- run `scrape.py` in the background,
+	- run `handle.py` on the generated output,
+	- show status, logs, and certification counts on a results page.
+
+Web app features:
+
+* Persistent job history across restarts (SQLite database: `jobs.db`)
+* Cancel running jobs from the job details page
+* Download generated CSV artifacts (`allinfo`, `data`, `all_certs`) from the UI
+
+## Troubleshooting
+
+* If `python handle.py -f cyber_allinfo.csv` prints `{}`, your scrape likely did not capture certifications in that run.
+* LinkedIn frequently changes page markup, and some jobs simply do not list cert requirements.
+* `Job detail pane failed to render ...` is now informational: the scraper still uses HTTP page parsing fallback.
+* Try a broader search and process more jobs:
+
+```bash
+python scrape.py -j "cybersecurity" -l "sydney" --max 200 -o cyber -b chrome -i 1.5
+python handle.py -f cyber_allinfo.csv
+```
+
+* Keep the browser open for debugging page behavior:
+
+```bash
+python scrape.py -j "cybersecurity" -l "sydney" -q -o cyber -b chrome --keep-open
+```

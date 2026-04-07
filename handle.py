@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
+"""
+LinkedInfoSec – handle.py
+=========================
+Post-processing script that reads a *_allinfo.csv file produced by scrape.py
+and counts how often each certification token appears across all listed jobs.
 
-import argparse	#needed for parsing commandline arguments
+Outputs a ranked dict to stdout, which app.py captures as the ``certs`` result
+for a completed pipeline run.
+
+Usage:
+    python handle.py -f <output_prefix>_allinfo.csv
+
+Original project by ahessmat: https://github.com/ahessmat/LinkedInfoSec
+"""
+
+import argparse	# needed for parsing commandline arguments
 import os.path
 import re
 
@@ -15,6 +29,9 @@ if not os.path.exists(filename):
 
 d = {}
 
+# Each line in allinfo.csv contains a Python set literal in the certs column,
+# e.g.  {"CISSP", "OSCP"}.  We extract every single-quoted token from those
+# set strings and count occurrences across all jobs.
 with open(f'{filename}', 'r') as f:
 	lines = f.readlines()
 	pattern = r"'([A-Za-z0-9_\./\\-]*)'"

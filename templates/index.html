@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinkedInfoSec Automation</title>
+  <style>
+    body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
+    .wrap { max-width: 980px; margin: 40px auto; padding: 0 20px; }
+    .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 22px; }
+    h1 { margin-top: 0; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    label { display: block; font-size: 14px; margin-bottom: 4px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #c8bca9; }
+    button { margin-top: 10px; padding: 10px 14px; border: 0; border-radius: 10px; background: #005f73; color: white; cursor: pointer; }
+    .toolbar { display: grid; gap: 12px; grid-template-columns: 2fr 1fr; margin-bottom: 12px; }
+    .muted { color: #5c6b75; font-size: 14px; margin: 6px 0 0; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 10px; border-bottom: 1px solid #ece6dd; text-align: left; }
+    a { color: #005f73; }
+    .btn-sm { padding: 4px 10px; border: 0; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .btn-view { background: #005f73; color: white; text-decoration: none; display: inline-block; }
+    .btn-edit { background: #7a5c00; color: white; }
+    .btn-del  { background: #9b1724; color: white; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; overflow-y: auto; }
+    .modal-box { background: #fff; max-width: 700px; margin: 40px auto; padding: 28px; border-radius: 14px; position: relative; }
+    .modal-close { position: absolute; top: 14px; right: 18px; font-size: 22px; cursor: pointer; background: none; border: none; color: #555; }
+  </style>
+</head>
+<body>
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="modal-overlay">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeEditModal()" title="Close">&times;</button>
+      <h2 style="margin-top:0">Edit &amp; Rerun Job</h2>
+      <p class="muted">Creates a new job with the edited parameters below.</p>
+      <form method="post" action="/start">
+        <div class="grid">
+          <div><label>Job keyword</label><input id="e-job" name="job" required></div>
+          <div><label>Location</label><input id="e-location" name="location" required></div>
+          <div><label>Keywords filter</label><input id="e-keywords" name="keywords"></div>
+          <div><label>Seniority</label><input id="e-seniority" name="seniority"></div>
+          <div>
+            <label>Time window</label>
+            <select id="e-time_window" name="time_window">
+              <option value="all">all</option>
+              <option value="day">day</option>
+              <option value="week">week</option>
+              <option value="month">month</option>
+            </select>
+          </div>
+          <div>
+            <label>Browser</label>
+            <select id="e-browser" name="browser">
+              <option value="chrome">chrome</option>
+              <option value="firefox">firefox</option>
+            </select>
+          </div>
+          <div><label>Increment seconds</label><input id="e-increment" name="increment"></div>
+          <div><label>Max jobs (optional)</label><input id="e-max_jobs" name="max_jobs" placeholder="200"></div>
+          <div><label>Output prefix</label><input id="e-output_name" name="output_name"></div>
+        </div>
+        <p><label><input id="e-quick" type="checkbox" name="quick"> Quick mode</label></p>
+        <input type="hidden" id="e-original-job-id" name="original_job_id" value="">
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button type="submit">Start New Job</button>
+          <button type="button" style="background:#888" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h1>LinkedInfoSec Web Runner</h1>
+      <p>Submit a scraping job and let scrape.py + handle.py run in the background.</p>
+      <form method="post" action="/start">
+        <div class="grid">
+          <div>
+            <label>Job keyword</label>
+            <input name="job" value="cybersecurity" required>
+          </div>
+          <div>
+            <label>Location</label>
+            <input name="location" value="sydney" required>
+          </div>
+          <div>
+            <label>Keywords filter</label>
+            <input name="keywords" placeholder="soc analyst cloud">
+          </div>
+          <div>
+            <label>Seniority</label>
+            <input name="seniority" value="12345">
+          </div>
+          <div>
+            <label>Time window</label>
+            <select name="time_window">
+              <option value="all" selected>all</option>
+              <option value="day">day</option>
+              <option value="week">week</option>
+              <option value="month">month</option>
+            </select>
+          </div>
+          <div>
+            <label>Browser</label>
+            <select name="browser">
+              <option value="chrome" selected>chrome</option>
+              <option value="firefox">firefox</option>
+            </select>
+          </div>
+          <div>
+            <label>Increment seconds</label>
+            <input name="increment" value="1.5">
+          </div>
+          <div>
+            <label>Max jobs (optional)</label>
+            <input name="max_jobs" placeholder="200">
+          </div>
+          <div>
+            <label>Output prefix</label>
+            <input name="output_name" value="web_run">
+          </div>
+        </div>
+        <p><label><input type="checkbox" name="quick"> Quick mode (first 100 listings)</label></p>
+        <button type="submit">Start Background Job</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>All Jobs</h2>
+      <div class="toolbar">
+        <div>
+          <label for="job-search">Search by ID, status, job, location, output</label>
+          <input id="job-search" placeholder="e.g. failed, sydney, cybersecurity">
+        </div>
+        <div>
+          <label for="status-filter">Status</label>
+          <select id="status-filter">
+            <option value="">all</option>
+            <option value="queued">queued</option>
+            <option value="running">running</option>
+            <option value="completed">completed</option>
+            <option value="failed">failed</option>
+            <option value="canceled">canceled</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted" id="jobs-counter"></p>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Status</th><th>Job</th><th>Location</th><th>Output</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="jobs-table-body">
+          {% for j in recent_jobs %}
+          <tr data-status="{{ j.status|lower }}" data-search="{{ j.id }} {{ j.status }} {{ j.params.job }} {{ j.params.location }} {{ j.output_prefix }}">
+            <td>{{ j.id }}</td>
+            <td class="status-cell">{{ j.status }}</td>
+            <td>{{ j.params.job }}</td>
+            <td>{{ j.params.location }}</td>
+            <td>{{ j.output_prefix }}</td>
+            <td style="white-space:nowrap">
+              <a class="btn-sm btn-view" href="/job/{{ j.id }}">View</a>
+              <button class="btn-sm btn-edit" type="button"
+                data-params='{{ j.params | tojson }}'
+                data-job-id="{{ j.id }}"
+                onclick="openEditModal(this)">Edit</button>
+              <form method="post" action="/delete/{{ j.id }}" style="display:inline"
+                onsubmit="return confirm('Delete job {{ j.id }}?')">
+                <button class="btn-sm btn-del" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr id="empty-row"><td colspan="6">No jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const searchInput = document.getElementById("job-search");
+    const statusFilter = document.getElementById("status-filter");
+    const jobsBody = document.getElementById("jobs-table-body");
+    const counter = document.getElementById("jobs-counter");
+
+    function applyFilters() {
+      if (!jobsBody) return;
+      const rows = Array.from(jobsBody.querySelectorAll("tr")).filter((row) => row.id !== "empty-row");
+      const query = (searchInput.value || "").trim().toLowerCase();
+      const status = (statusFilter.value || "").trim().toLowerCase();
+
+      let visible = 0;
+      rows.forEach((row) => {
+        const haystack = (row.dataset.search || "").toLowerCase();
+        const rowStatus = (row.dataset.status || "").toLowerCase();
+        const passQuery = !query || haystack.includes(query);
+        const passStatus = !status || rowStatus === status;
+        const show = passQuery && passStatus;
+        row.style.display = show ? "" : "none";
+        if (show) visible += 1;
+      });
+
+      if (rows.length === 0) {
+        counter.textContent = "No jobs available yet.";
+      } else {
+        counter.textContent = `Showing ${visible} of ${rows.length} jobs`;
+      }
+    }
+
+    if (searchInput && statusFilter) {
+      searchInput.addEventListener("input", applyFilters);
+      statusFilter.addEventListener("change", applyFilters);
+      applyFilters();
+    }
+
+    function openEditModal(btn) {
+      const params = JSON.parse(btn.dataset.params);
+      document.getElementById("e-original-job-id").value = btn.dataset.jobId || "";
+      document.getElementById("e-job").value = params.job || "";
+      document.getElementById("e-location").value = params.location || "";
+      document.getElementById("e-keywords").value = params.keywords || "";
+      document.getElementById("e-seniority").value = params.seniority || "12345";
+      document.getElementById("e-increment").value = params.increment || "1.5";
+      document.getElementById("e-max_jobs").value = params.max_jobs || "";
+      document.getElementById("e-output_name").value = params.output_name || "web_run";
+      document.getElementById("e-quick").checked = !!params.quick;
+      const tw = document.getElementById("e-time_window");
+      for (const opt of tw.options) opt.selected = opt.value === (params.time_window || "all");
+      const br = document.getElementById("e-browser");
+      for (const opt of br.options) opt.selected = opt.value === (params.browser || "chrome");
+      document.getElementById("edit-modal").style.display = "block";
+    }
+
+    function closeEditModal() {
+      document.getElementById("edit-modal").style.display = "none";
+    }
+
+    document.getElementById("edit-modal").addEventListener("click", function(e) {
+      if (e.target === this) closeEditModal();
+    });
+  </script>
+</body>
+</html>

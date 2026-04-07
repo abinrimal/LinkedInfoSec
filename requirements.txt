@@ -1,0 +1,6 @@
+selenium
+requests
+pandas
+tqdm
+urllib3<2
+flask
