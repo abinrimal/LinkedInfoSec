@@ -130,8 +130,9 @@
       <h2>All Jobs</h2>
       <p>
         <form method="post" action="/clear-completed" style="display:inline"
-          onsubmit="return confirm('Delete all completed, failed, and canceled jobs?\nThis cannot be undone.')">
-          <button type="submit" style="background:#666">Clear Completed Jobs</button>
+          onsubmit="return confirm('Delete ' + countCompletedJobs() + ' job(s)?\nThis cannot be undone.')">
+          <button type="submit" id="clear-btn" style="background:#666">Clear Completed Jobs</button>
+          <span id="completed-count" style="margin-left:10px;color:#666;font-size:13px"></span>
         </form>
       </p>
       <div class="toolbar">
@@ -244,6 +245,34 @@
     document.getElementById("edit-modal").addEventListener("click", function(e) {
       if (e.target === this) closeEditModal();
     });
+
+    function countCompletedJobs() {
+      if (!jobsBody) return 0;
+      const rows = Array.from(jobsBody.querySelectorAll("tr")).filter((row) => row.id !== "empty-row");
+      return rows.filter((row) => {
+        const status = (row.dataset.status || "").toLowerCase();
+        return status === "completed" || status === "failed" || status === "canceled";
+      }).length;
+    }
+
+    function updateClearedCount() {
+      const count = countCompletedJobs();
+      const countSpan = document.getElementById("completed-count");
+      if (countSpan) {
+        if (count > 0) {
+          countSpan.textContent = `(${count} job${count !== 1 ? "s" : ""} to clear)`;
+          document.getElementById("clear-btn").disabled = false;
+        } else {
+          countSpan.textContent = "(no completed jobs)";
+          document.getElementById("clear-btn").disabled = true;
+        }
+      }
+    }
+
+    // Update count on page load and whenever filter/search changes
+    updateClearedCount();
+    if (searchInput) searchInput.addEventListener("input", updateClearedCount);
+    if (statusFilter) statusFilter.addEventListener("change", updateClearedCount);
   </script>
 </body>
 </html>
