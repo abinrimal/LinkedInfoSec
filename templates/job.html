@@ -28,6 +28,12 @@
       <p>
         <button id="cancel-btn" type="button">Cancel Job</button>
       </p>
+        <p>
+          <form id="rerun-form" method="post" action="/rerun/{{ job.id }}" style="display:inline">
+            <button type="submit" id="rerun-btn"
+              {% if job.status in ['queued', 'running'] %}disabled{% endif %}>Re-run Job</button>
+          </form>
+        </p>
       <p>
         <a href="/download/{{ job.id }}/allinfo">Download allinfo CSV</a> |
         <a href="/download/{{ job.id }}/data">Download data CSV</a> |
@@ -93,6 +99,7 @@
     const certsBody = document.getElementById("certs-body");
     const jobsBody = document.getElementById("jobs-body");
     const cancelBtn = document.getElementById("cancel-btn");
+  const rerunBtn = document.getElementById("rerun-btn");
 
     function toggleSection(id, btn) {
       const el = document.getElementById(id);
@@ -153,6 +160,13 @@
       if (data.status === "completed" || data.status === "failed" || data.status === "canceled") {
         cancelBtn.disabled = true;
       }
+
+        // Enable Re-run once the job has settled; disable it while still running.
+        if (data.status === "completed" || data.status === "failed" || data.status === "canceled") {
+          rerunBtn.disabled = false;
+        } else {
+          rerunBtn.disabled = true;
+        }
 
       if (data.status === "completed" || data.status === "failed" || data.status === "canceled") {
         return;
