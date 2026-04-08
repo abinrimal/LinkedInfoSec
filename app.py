@@ -524,33 +524,24 @@ def _parse_education_details(education_text):
 
 
 def _rewrite_experience_bullets(raw_points, req_summary, ats_keywords):
-    """Rewrite responsibilities into concise JD-aligned, ATS-friendly bullets."""
+    """Preserve candidate bullets and contextually align them with JD keywords."""
     points = [" ".join((p or "").split()).strip(" .") for p in raw_points if p and str(p).strip()]
     if not points:
-        points = [
-            "Delivered role responsibilities in fast-paced environments",
-            "Coordinated with stakeholders to keep priorities aligned",
+        return [
+            f"Delivered responsibilities aligned with {req_summary}.",
+            "Collaborated with cross-functional stakeholders to support consistent delivery.",
         ]
 
     rewritten = []
-    for idx, p in enumerate(points[:3]):
-        if idx == 0:
-            rewritten.append(f"Applied {p.lower()} while aligning delivery with priorities in {req_summary}.")
-        elif idx == 1:
-            keyword = ats_keywords[0] if ats_keywords else "key job requirements"
-            rewritten.append(f"Improved quality and consistency by using {keyword} practices and clear execution standards.")
-        else:
-            rewritten.append(f"Collaborated across teams to resolve blockers quickly and maintain reliable delivery outcomes.")
-
-    metrics = re.findall(r"\b\d+%\b|\$\s?\d[\d,]*(?:\.\d+)?|\b\d+\+?\s+(?:projects|clients|tickets|incidents|reports|users|systems)\b", " ".join(points), re.I)
-    if metrics:
-        rewritten.append(f"Delivered measurable outcomes including {metrics[0]}, supporting stronger business performance.")
-
-    if len(rewritten) < 4:
-        keyword = ats_keywords[1] if len(ats_keywords) > 1 else "stakeholder communication"
-        rewritten.append(f"Produced concise documentation and updates to improve {keyword} and decision-making speed.")
-
-    return rewritten[:4]
+    for idx, p in enumerate(points[:4]):
+        line = p[0].upper() + p[1:] if p else p
+        if not line.endswith("."):
+            line += "."
+        if ats_keywords and not any(k.lower() in line.lower() for k in ats_keywords):
+            kw = ats_keywords[idx % len(ats_keywords)]
+            line = line.rstrip(".") + f", aligned with {kw} requirements."
+        rewritten.append(line)
+    return rewritten
 
 
 def _parse_candidate_experience_entries(experience_text, target_role, location, req_summary, ats_keywords):
@@ -778,10 +769,6 @@ def _build_resume(row, candidate):
             "Demonstrated strong ownership and collaborative communication to support role priorities and delivery quality."
         ]
 
-    certs = re.findall(r"'([^']+)'", row.get("certs", "") or "")
-    if certs:
-        notes_items.append("Relevant certifications include " + ", ".join(certs[:5]) + ".")
-
     experience_entries = _parse_candidate_experience_entries(exp_text, title, location, req_summary, matched_ats)
 
     return {
@@ -793,7 +780,7 @@ def _build_resume(row, candidate):
             "location": location,
         },
         "professional_summary": summary,
-        "education": _parse_education_details(education),
+        "education": " ".join(education.split()).strip(),
         "work_experience": experience_entries,
         "skills": skills,
         "additional_notes": notes_items,

@@ -129,13 +129,7 @@
 
       <div class="resume-section">
         <h3>Education</h3>
-        <p>
-          {% if resume.education.degree %}{{ resume.education.degree }}{% endif %}
-          {% if resume.education.field %}<br>{{ resume.education.field }}{% endif %}
-          {% if resume.education.year or resume.education.institution %}
-            <br>{% if resume.education.year %}{{ resume.education.year }}{% endif %}{% if resume.education.year and resume.education.institution %} | {% endif %}{% if resume.education.institution %}{{ resume.education.institution }}{% endif %}
-          {% endif %}
-        </p>
+        <p>{{ resume.education }}</p>
       </div>
 
       <div class="resume-section">
