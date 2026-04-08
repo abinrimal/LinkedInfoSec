@@ -60,11 +60,12 @@
     <div class="card">
       <h2>Scraped Jobs</h2>
       <table>
-        <thead><tr><th>LinkedIn Job ID</th><th>Title</th><th>Open Date</th><th>Close Date</th><th>Certs</th><th>Description</th></tr></thead>
+        <thead><tr><th>LinkedIn Job ID</th><th>Job Link</th><th>Title</th><th>Open Date</th><th>Close Date</th><th>Certs</th><th>Description</th></tr></thead>
         <tbody id="jobs-body">
           {% for row in job.scraped_jobs %}
           <tr>
             <td><a href="https://www.linkedin.com/jobs/view/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">{{ row.job_id }}</a></td>
+            <td><a href="https://www.linkedin.com/jobs/view/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">Open</a></td>
             <td>{{ row.title }}</td>
             <td>{{ row.open_date }}</td>
             <td>{{ row.close_date }}</td>
@@ -72,7 +73,7 @@
             <td title="{{ row.description }}">{{ row.description[:150] }}{% if row.description|length > 150 %}…{% endif %}</td>
           </tr>
           {% else %}
-          <tr><td colspan="6">No scraped jobs yet.</td></tr>
+          <tr><td colspan="7">No scraped jobs yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -125,7 +126,7 @@
 
     function renderScrapedJobs(rows) {
       if (!rows || rows.length === 0) {
-        jobsBody.innerHTML = "<tr><td colspan='6'>No scraped jobs yet.</td></tr>";
+        jobsBody.innerHTML = "<tr><td colspan='7'>No scraped jobs yet.</td></tr>";
         return;
       }
       jobsBody.innerHTML = rows
@@ -136,6 +137,7 @@
           const escapedShort = shortDesc.replace(/</g, "&lt;").replace(/>/g, "&gt;");
           return `<tr>
             <td><a href="https://www.linkedin.com/jobs/view/${r.job_id}" target="_blank" rel="noopener noreferrer">${r.job_id}</a></td>
+            <td><a href="https://www.linkedin.com/jobs/view/${r.job_id}" target="_blank" rel="noopener noreferrer">Open</a></td>
             <td>${r.title || ""}</td>
             <td>${r.open_date || ""}</td>
             <td>${r.close_date || ""}</td>
