@@ -8,6 +8,8 @@
     body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
     .wrap { width: min(96vw, 1600px); margin: 24px auto; padding: 0 18px; }
     .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+    .topnav { display: flex; gap: 10px; margin-bottom: 16px; }
+    .topnav a { text-decoration: none; border: 1px solid #c8bca9; border-radius: 8px; padding: 6px 10px; background: #fffaf2; color: #005f73; }
     h1, h2 { margin-top: 0; }
     a { color: #005f73; }
     .meta { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
@@ -18,8 +20,12 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="topnav">
+      <a href="/">Home</a>
+      <a href="javascript:history.back()">Back</a>
+    </div>
+
     <div class="card">
-      <p><a href="/job/{{ job.id }}">Back to Job</a></p>
       <h1>Sample Cover Letter (APA Style)</h1>
       <div class="meta">
         <div><strong>LinkedIn Job ID:</strong> {{ row.job_id }}</div>

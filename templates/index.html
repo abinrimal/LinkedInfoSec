@@ -8,6 +8,8 @@
     body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
     .wrap { max-width: 980px; margin: 40px auto; padding: 0 20px; }
     .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 22px; }
+    .topnav { display: flex; gap: 10px; margin-bottom: 16px; }
+    .topnav a { text-decoration: none; border: 1px solid #c8bca9; border-radius: 8px; padding: 6px 10px; background: #fffaf2; }
     h1 { margin-top: 0; }
     .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
     label { display: block; font-size: 14px; margin-bottom: 4px; }
@@ -71,6 +73,11 @@
   </div>
 
   <div class="wrap">
+    <div class="topnav">
+      <a href="/">Home</a>
+      <a href="javascript:history.back()">Back</a>
+    </div>
+
     <div class="card">
       <h1>LinkedInfoSec Web Runner</h1>
       <p>Submit a scraping job and let scrape.py + handle.py run in the background.</p>

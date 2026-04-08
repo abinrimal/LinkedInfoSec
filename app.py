@@ -370,9 +370,38 @@ def _build_cover_letter(row):
     title = row.get("title") or "Cybersecurity Role"
     tags = row.get("tags") or []
     criteria = row.get("criteria") or []
+    description = (row.get("description") or "").lower()
 
-    tag_line = ", ".join(tags) if tags else "Cybersecurity, Risk Management, Communication"
-    criteria_line = "\n".join([f"- {c}" for c in criteria[:4]]) if criteria else "- Demonstrated cybersecurity fundamentals and clear communication skills"
+    title_lower = title.lower()
+    is_security_role = any(word in title_lower for word in ["cyber", "security", "soc", "threat", "grc", "iso 27001"]) or any(
+        "security" in tag.lower() for tag in tags
+    ) or any(word in description for word in ["cyber", "security", "incident response", "siem", "vulnerability"])
+
+    if is_security_role:
+        profile_line = (
+            "My background in cybersecurity operations and risk reduction, combined with practical "
+            "delivery across"
+        )
+        contribution_line = "I can contribute quickly, collaborate effectively, and help the team improve security outcomes from day one."
+        impact_line = (
+            "In comparable roles, I have supported detection and response workflows, improved analyst-ready "
+            "documentation, and translated technical findings into clear recommendations for stakeholders."
+        )
+        fallback_criteria = "- Demonstrated cybersecurity fundamentals and clear communication skills"
+    else:
+        profile_line = (
+            "My professional background and execution-focused project delivery, combined with practical "
+            "experience across"
+        )
+        contribution_line = "I can contribute quickly, collaborate effectively, and help the team deliver reliable outcomes from day one."
+        impact_line = (
+            "In comparable roles, I have delivered measurable outcomes through structured execution, "
+            "cross-functional collaboration, and clear stakeholder communication."
+        )
+        fallback_criteria = "- Demonstrated role-relevant delivery skills and clear communication"
+
+    tag_line = ", ".join(tags) if tags else "Stakeholder Communication, Execution, Problem Solving"
+    criteria_line = "\n".join([f"- {c}" for c in criteria[:4]]) if criteria else fallback_criteria
 
     return (
         f"[Applicant Name]\n"
@@ -385,14 +414,12 @@ def _build_cover_letter(row):
         f"[Company Address]\n\n"
         f"Subject: Application for {title}\n\n"
         f"Dear Hiring Manager,\n\n"
-        f"I am writing to apply for the {title} role. My background in cybersecurity operations, "
-        f"combined with practical experience across {tag_line}, aligns with the priorities outlined in your posting. "
-        f"I can contribute quickly, collaborate effectively, and help the team improve security outcomes from day one.\n\n"
+        f"I am writing to apply for the {title} role. {profile_line} {tag_line}, aligns with the priorities outlined in your posting. "
+        f"{contribution_line}\n\n"
         f"From your description, the highest-value criteria appear to be:\n"
         f"{criteria_line}\n\n"
-        f"In comparable roles, I have supported detection and response workflows, improved analyst-ready documentation, "
-        f"and translated technical findings into clear recommendations for stakeholders. I am confident this mix of "
-        f"hands-on execution and communication can help your team move efficiently from alert triage to measurable risk reduction.\n\n"
+        f"{impact_line} I am confident this mix of hands-on execution and communication can help your team "
+        f"move efficiently from requirements to measurable outcomes.\n\n"
         f"I would welcome a first screening phone call to discuss how my experience maps to your current needs and how "
         f"I can support rapid onboarding into this position. Thank you for your consideration.\n\n"
         f"Sincerely,\n"

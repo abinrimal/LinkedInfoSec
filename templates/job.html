@@ -8,6 +8,8 @@
     body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
     .wrap { width: min(98vw, 1800px); margin: 24px auto; padding: 0 16px; }
     .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+    .topnav { display: flex; gap: 10px; margin-bottom: 16px; }
+    .topnav a { text-decoration: none; border: 1px solid #c8bca9; border-radius: 8px; padding: 6px 10px; background: #fffaf2; }
     .status { font-weight: bold; }
     pre { background: #f3efe8; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
     .toggle-btn { background: none; border: 1px solid #c8bca9; border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 13px; color: #005f73; margin-bottom: 8px; }
@@ -19,8 +21,12 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="topnav">
+      <a href="/">Home</a>
+      <a href="javascript:history.back()">Back</a>
+    </div>
+
     <div class="card">
-      <p><a href="/">Back</a></p>
       <h1>Job {{ job.id }}</h1>
       <p>Output prefix: <span id="output-prefix">{{ job.output_prefix }}</span></p>
       <p>Status: <span id="status" class="status">{{ job.status }}</span></p>
