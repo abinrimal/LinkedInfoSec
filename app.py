@@ -495,6 +495,161 @@ def _build_cover_letter(row, candidate):
     )
 
 
+def _parse_education_details(education_text):
+    """Parse education text into degree, field, year, institution."""
+    text = " ".join((education_text or "").split()).strip()
+    result = {
+        "degree": "As Provided",
+        "field": "As Provided",
+        "year": "As Provided",
+        "institution": "As Provided",
+    }
+    if not text:
+        return result
+
+    result["degree"] = text
+    year_match = re.search(r"\b(19|20)\d{2}\b", text)
+    if year_match:
+        result["year"] = year_match.group(0)
+
+    field_match = re.search(r"in\s+([A-Za-z][A-Za-z\s&/]+)", text, re.I)
+    if field_match:
+        result["field"] = " ".join(field_match.group(1).split())
+
+    parts = [p.strip() for p in re.split(r",|\|| - ", text) if p.strip()]
+    if len(parts) >= 2:
+        result["institution"] = parts[-1]
+
+    return result
+
+
+def _rewrite_experience_bullets(raw_points, req_summary, ats_keywords):
+    """Rewrite responsibilities into concise JD-aligned, ATS-friendly bullets."""
+    points = [" ".join((p or "").split()).strip(" .") for p in raw_points if p and str(p).strip()]
+    if not points:
+        points = [
+            "Delivered role responsibilities in fast-paced environments",
+            "Coordinated with stakeholders to keep priorities aligned",
+        ]
+
+    rewritten = []
+    for idx, p in enumerate(points[:3]):
+        if idx == 0:
+            rewritten.append(f"Applied {p.lower()} while aligning delivery with priorities in {req_summary}.")
+        elif idx == 1:
+            keyword = ats_keywords[0] if ats_keywords else "key job requirements"
+            rewritten.append(f"Improved quality and consistency by using {keyword} practices and clear execution standards.")
+        else:
+            rewritten.append(f"Collaborated across teams to resolve blockers quickly and maintain reliable delivery outcomes.")
+
+    metrics = re.findall(r"\b\d+%\b|\$\s?\d[\d,]*(?:\.\d+)?|\b\d+\+?\s+(?:projects|clients|tickets|incidents|reports|users|systems)\b", " ".join(points), re.I)
+    if metrics:
+        rewritten.append(f"Delivered measurable outcomes including {metrics[0]}, supporting stronger business performance.")
+
+    if len(rewritten) < 4:
+        keyword = ats_keywords[1] if len(ats_keywords) > 1 else "stakeholder communication"
+        rewritten.append(f"Produced concise documentation and updates to improve {keyword} and decision-making speed.")
+
+    return rewritten[:4]
+
+
+def _parse_candidate_experience_entries(experience_text, target_role, location, req_summary, ats_keywords):
+    """Parse candidate profile experience into structured entries.
+
+    Supported formats:
+    1) JSON list of objects with keys: title, company, dates, location,
+       employment_type, responsibilities, achievements.
+    2) Pipe-delimited lines:
+       title | company | dates | location | employment_type | responsibility...
+    3) Fallback plain text summary (single inferred role entry).
+    """
+    text = (experience_text or "").strip()
+    if not text:
+        return []
+
+    entries = []
+
+    # JSON format support
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        if isinstance(parsed, list):
+            for item in parsed:
+                if not isinstance(item, dict):
+                    continue
+                title = str(item.get("title") or item.get("job_title") or target_role).strip()
+                company = str(item.get("company") or "As Provided").strip()
+                dates = str(item.get("dates") or "As Provided").strip()
+                loc = str(item.get("location") or location or "As Provided").strip()
+                emp_type = str(item.get("employment_type") or "As Provided").strip()
+
+                responsibilities = item.get("responsibilities") or []
+                achievements = item.get("achievements") or []
+                raw_points = []
+                if isinstance(responsibilities, str):
+                    raw_points.extend([p.strip() for p in responsibilities.split(";") if p.strip()])
+                elif isinstance(responsibilities, list):
+                    raw_points.extend([str(p).strip() for p in responsibilities if str(p).strip()])
+
+                if isinstance(achievements, str):
+                    raw_points.extend([p.strip() for p in achievements.split(";") if p.strip()])
+                elif isinstance(achievements, list):
+                    raw_points.extend([str(p).strip() for p in achievements if str(p).strip()])
+
+                bullets = _rewrite_experience_bullets(raw_points, req_summary, ats_keywords)
+                entries.append({
+                    "title": title,
+                    "company": company,
+                    "dates": dates,
+                    "location": loc,
+                    "employment_type": emp_type,
+                    "bullets": bullets,
+                })
+    except json.JSONDecodeError:
+        pass
+
+    if entries:
+        return entries
+
+    # Pipe-delimited lines support
+    for line in [ln.strip() for ln in text.splitlines() if ln.strip()]:
+        if "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+        title, company, dates, loc, emp_type = parts[:5]
+        raw_rest = parts[5:]
+        raw_points = []
+        for chunk in raw_rest:
+            raw_points.extend([p.strip() for p in re.split(r";|\\. ", chunk) if p.strip()])
+        bullets = _rewrite_experience_bullets(raw_points, req_summary, ats_keywords)
+        entries.append({
+            "title": title,
+            "company": company,
+            "dates": dates,
+            "location": loc,
+            "employment_type": emp_type,
+            "bullets": bullets,
+        })
+
+    if entries:
+        return entries
+
+    # Fallback: infer one role entry from plain text profile summary.
+    fallback_title = target_role if target_role and target_role != "Target Role" else "Professional Experience"
+    raw_points = [p.strip() for p in re.split(r",|;", text) if p.strip()]
+    return [{
+        "title": fallback_title,
+        "company": "As Provided",
+        "dates": "As Provided",
+        "location": location or "As Provided",
+        "employment_type": "As Provided",
+        "bullets": _rewrite_experience_bullets(raw_points, req_summary, ats_keywords),
+    }]
+
+
 def _build_resume(row, candidate):
     """Build a structured, job-tailored resume payload for template rendering."""
     title = row.get("title") or "Target Role"
@@ -560,13 +715,33 @@ def _build_resume(row, candidate):
     else:
         req_summary = "delivery ownership, stakeholder communication, and problem solving"
 
+    # Build 3-5 sentence professional summary with integrated achievements/value.
+    notes_phrase = " ".join(additional_notes.split()).strip(" .")
     if is_finance_role:
         summary = (
-            f"Detail-oriented professional with {years_text} of experience delivering accurate and timely finance outcomes in fast-paced environments. "
-            f"I bring practical capability in {', '.join(matched_ats[:3])}, with a strong focus on reconciliation quality, month-end reliability, and clear reporting. "
-            f"My background combines hands-on execution with stakeholder collaboration, enabling me to resolve discrepancies quickly and maintain compliance standards. "
-            f"I am prepared to contribute immediate value in the {title} role by improving data integrity, process consistency, and decision-ready financial insights."
+            f"Results-oriented professional with {years_text} of experience supporting high-accuracy finance and operations delivery. "
+            f"I bring practical capability in {', '.join(matched_ats[:3]) if matched_ats else 'reconciliation, reporting, and stakeholder communication'}, "
+            f"and consistently align execution with priorities such as {req_summary}. "
+            f"My experience combines process discipline, quality control, and cross-functional collaboration to improve turnaround time and reporting reliability. "
+            f"{notes_phrase.capitalize() if notes_phrase else 'I am known for dependable ownership and clear communication.'}"
         )
+    elif is_security_role:
+        summary = (
+            f"Security-focused professional with {years_text} of practical experience delivering operational and risk-reduction outcomes. "
+            f"I apply strengths in {', '.join(matched_ats[:3]) if matched_ats else 'incident coordination, communication, and documentation'} "
+            f"to align execution with role priorities including {req_summary}. "
+            f"I have a strong track record of translating technical issues into actionable steps that improve resilience and delivery quality. "
+            f"{notes_phrase.capitalize() if notes_phrase else 'I bring calm ownership and clear stakeholder communication in high-pressure contexts.'}"
+        )
+    else:
+        summary = (
+            f"Results-driven professional with {years_text} of experience delivering measurable outcomes across dynamic, cross-functional environments. "
+            f"I bring transferable strengths in {', '.join(matched_ats[:3]) if matched_ats else 'problem solving, communication, and execution'} and align work to priorities such as {req_summary}. "
+            f"My approach combines structured execution, proactive collaboration, and practical decision-making to keep delivery on track and outcomes reliable. "
+            f"{notes_phrase.capitalize() if notes_phrase else 'I am known for dependable ownership and continuous improvement.'}"
+        )
+
+    if is_finance_role:
         work_bullets = [
             f"Applied {exp_text} to support finance operations aligned with {req_summary}, improving processing reliability and turnaround time.",
             f"Used {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to improve reconciliation accuracy and reduce month-end rework.",
@@ -575,12 +750,6 @@ def _build_resume(row, candidate):
         ]
         skills = list(dict.fromkeys(matched_ats + profile_skills + ["Reconciliation", "Financial Reporting", "Attention to Detail"]))[:12]
     elif is_security_role:
-        summary = (
-            f"Security-focused professional with {years_text} of practical delivery experience across high-priority operational environments. "
-            f"My work emphasizes {', '.join(matched_ats[:3])}, translating risk and incident signals into clear, actionable controls and response outcomes. "
-            f"I combine technical execution with stakeholder communication to improve resilience, reduce operational friction, and maintain delivery quality. "
-            f"For the {title} role, I offer strong ownership, clear documentation, and rapid alignment with team priorities."
-        )
         work_bullets = [
             f"Applied {exp_text} to deliver outcomes aligned to {req_summary}, improving consistency and response quality across security operations.",
             f"Leveraged {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to prioritize actionable findings and support timely risk treatment.",
@@ -589,12 +758,6 @@ def _build_resume(row, candidate):
         ]
         skills = list(dict.fromkeys(matched_ats + profile_skills + ["Risk Reduction", "Incident Coordination", "Security Documentation"]))[:12]
     else:
-        summary = (
-            f"Results-driven professional with {years_text} of experience delivering structured outcomes in dynamic, cross-functional environments. "
-            f"I bring practical strength in {', '.join(matched_ats[:3])}, converting requirements into executable plans and measurable progress. "
-            f"My approach combines analytical problem solving, stakeholder communication, and disciplined follow-through to keep initiatives on track. "
-            f"In the {title} role, I can contribute quickly by aligning delivery decisions with business priorities and quality expectations."
-        )
         work_bullets = [
             f"Applied {exp_text} to execute priorities aligned with {req_summary}, ensuring reliable delivery and measurable progress.",
             f"Used {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to unblock issues quickly and maintain delivery momentum.",
@@ -607,6 +770,12 @@ def _build_resume(row, candidate):
     if not notes_items:
         notes_items = [additional_notes.strip()] if additional_notes.strip() else ["Strong ownership and collaborative working style"]
 
+    certs = re.findall(r"'([^']+)'", row.get("certs", "") or "")
+    if certs:
+        notes_items.append("Certifications aligned to the role: " + ", ".join(certs[:5]))
+
+    experience_entries = _parse_candidate_experience_entries(exp_text, title, location, req_summary, matched_ats)
+
     return {
         "target_role": title,
         "contact": {
@@ -616,15 +785,8 @@ def _build_resume(row, candidate):
             "location": location,
         },
         "professional_summary": summary,
-        "education": education,
-        "work_experience": [
-            {
-                "role": "Relevant Professional Experience",
-                "company": "Various Organizations",
-                "dates": "Recent Years",
-                "bullets": work_bullets,
-            }
-        ],
+        "education": _parse_education_details(education),
+        "work_experience": experience_entries,
         "skills": skills,
         "additional_notes": notes_items,
     }

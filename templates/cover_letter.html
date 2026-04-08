@@ -129,13 +129,21 @@
 
       <div class="resume-section">
         <h3>Education</h3>
-        <p>{{ resume.education }}</p>
+        <p>
+          <strong>Degree:</strong> {{ resume.education.degree }}<br>
+          <strong>Field:</strong> {{ resume.education.field }}<br>
+          <strong>Year:</strong> {{ resume.education.year }}<br>
+          <strong>Institution:</strong> {{ resume.education.institution }}
+        </p>
       </div>
 
       <div class="resume-section">
         <h3>Work Experience</h3>
         {% for exp in resume.work_experience %}
-          <p><strong>{{ exp.role }}</strong> — {{ exp.company }} ({{ exp.dates }})</p>
+          <p>
+            <strong>{{ exp.title }}</strong> — {{ exp.company }}<br>
+            {{ exp.dates }} | {{ exp.location }} | {{ exp.employment_type }}
+          </p>
           <ul class="resume-list">
             {% for bullet in exp.bullets %}
               <li>{{ bullet }}</li>
