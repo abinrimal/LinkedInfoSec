@@ -328,6 +328,78 @@ def _output_file_for(job, artifact):
     return BASE_DIR / f"{output_prefix}{suffixes[artifact]}"
 
 
+def _extract_tags_and_criteria(description):
+    """Extract job tags and concise criteria lines from a description."""
+    if not description:
+        return [], []
+
+    description_lower = description.lower()
+    tag_patterns = {
+        "SIEM": r"\bsiem\b|\bsplunk\b|\bqradar\b|\bsentinel\b",
+        "Incident Response": r"incident\s+response|\bdfir\b|threat\s+hunting",
+        "Cloud Security": r"cloud\s+security|\baws\b|\bazure\b|\bgcp\b",
+        "Network Security": r"network\s+security|firewall|ids|ips|zero\s+trust",
+        "IAM": r"\biam\b|identity\s+and\s+access|okta|entra|active\s+directory",
+        "Governance/Risk": r"\bgrc\b|risk\s+management|compliance|iso\s*27001|nist",
+        "Penetration Testing": r"penetration\s+testing|pentest|red\s+team|vulnerability\s+assessment",
+        "Scripting": r"\bpython\b|\bpowershell\b|\bbash\b|automation",
+    }
+
+    tags = [name for name, pattern in tag_patterns.items() if re.search(pattern, description_lower)]
+
+    raw_parts = re.split(r"(?<=[\.!?])\s+|\s*;\s*", description)
+    criteria = []
+    criteria_signals = (
+        "required", "must", "experience", "ability", "knowledge", "proficient",
+        "familiar", "hands-on", "responsible", "skills", "qualifications"
+    )
+    for part in raw_parts:
+        cleaned = " ".join(part.strip().split())
+        if not cleaned:
+            continue
+        if any(signal in cleaned.lower() for signal in criteria_signals):
+            criteria.append(cleaned)
+        if len(criteria) >= 6:
+            break
+
+    return tags[:8], criteria
+
+
+def _build_cover_letter(row):
+    """Build an APA-style sample cover letter from parsed job row metadata."""
+    title = row.get("title") or "Cybersecurity Role"
+    tags = row.get("tags") or []
+    criteria = row.get("criteria") or []
+
+    tag_line = ", ".join(tags) if tags else "Cybersecurity, Risk Management, Communication"
+    criteria_line = "\n".join([f"- {c}" for c in criteria[:4]]) if criteria else "- Demonstrated cybersecurity fundamentals and clear communication skills"
+
+    return (
+        f"[Applicant Name]\n"
+        f"[Street Address]\n"
+        f"[City, State, Postcode]\n"
+        f"[Email Address] | [Phone Number]\n\n"
+        f"{datetime.utcnow().strftime('%B %d, %Y')}\n\n"
+        f"Hiring Manager\n"
+        f"[Company Name]\n"
+        f"[Company Address]\n\n"
+        f"Subject: Application for {title}\n\n"
+        f"Dear Hiring Manager,\n\n"
+        f"I am writing to apply for the {title} role. My background in cybersecurity operations, "
+        f"combined with practical experience across {tag_line}, aligns with the priorities outlined in your posting. "
+        f"I can contribute quickly, collaborate effectively, and help the team improve security outcomes from day one.\n\n"
+        f"From your description, the highest-value criteria appear to be:\n"
+        f"{criteria_line}\n\n"
+        f"In comparable roles, I have supported detection and response workflows, improved analyst-ready documentation, "
+        f"and translated technical findings into clear recommendations for stakeholders. I am confident this mix of "
+        f"hands-on execution and communication can help your team move efficiently from alert triage to measurable risk reduction.\n\n"
+        f"I would welcome a first screening phone call to discuss how my experience maps to your current needs and how "
+        f"I can support rapid onboarding into this position. Thank you for your consideration.\n\n"
+        f"Sincerely,\n"
+        f"[Applicant Name]"
+    )
+
+
 def _parse_allinfo_rows(job, max_rows=400):
     """Parse *_allinfo.csv and return a list of scraped-job dicts.
 
@@ -352,13 +424,26 @@ def _parse_allinfo_rows(job, max_rows=400):
                 job_id = row[0].strip()
                 if not job_id.isdigit():
                     continue
-                rows.append({
+                certs_text = (row[2] or "").strip()
+                if certs_text in {"set()", "{}"}:
+                    certs_text = ""
+                description = row[3] if len(row) > 3 else ""
+                if certs_text == "{'CEH'}" and "ceh" not in description.lower():
+                    certs_text = ""
+                tags, criteria = _extract_tags_and_criteria(description)
+                parsed_row = {
                     "job_id": job_id,
                     "title": row[1],
-                    "certs": row[2],
-                    "description": row[3] if len(row) > 3 else "",
+                    "certs": certs_text,
+                    "description": description,
                     "open_date": row[4] if len(row) > 4 else "",
                     "close_date": row[5] if len(row) > 5 else "",
+                    "tags": tags,
+                    "criteria": criteria,
+                }
+                parsed_row["cover_letter"] = _build_cover_letter(parsed_row)
+                rows.append({
+                    **parsed_row
                 })
                 if len(rows) >= max_rows:
                     break
@@ -491,6 +576,22 @@ def job_page(job_id):
     view_job = dict(job)
     view_job["scraped_jobs"] = _parse_allinfo_rows(job)
     return render_template("job.html", job=view_job)
+
+
+@app.route("/job/<job_id>/cover-letter/<linkedin_job_id>")
+def cover_letter_page(job_id, linkedin_job_id):
+    """Render a generated cover letter page for one scraped LinkedIn job row."""
+    with jobs_lock:
+        job = jobs.get(job_id)
+    if not job:
+        abort(404)
+
+    rows = _parse_allinfo_rows(job)
+    target = next((r for r in rows if r.get("job_id") == linkedin_job_id), None)
+    if not target:
+        abort(404)
+
+    return render_template("cover_letter.html", job=job, row=target)
 
 
 @app.route("/api/job/<job_id>")

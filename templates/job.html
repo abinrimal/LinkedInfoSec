@@ -6,7 +6,7 @@
   <title>Job {{ job.id }}</title>
   <style>
     body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
-    .wrap { max-width: 980px; margin: 40px auto; padding: 0 20px; }
+    .wrap { width: min(98vw, 1800px); margin: 24px auto; padding: 0 16px; }
     .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 20px; }
     .status { font-weight: bold; }
     pre { background: #f3efe8; border-radius: 10px; padding: 12px; white-space: pre-wrap; }
@@ -60,7 +60,7 @@
     <div class="card">
       <h2>Scraped Jobs</h2>
       <table>
-        <thead><tr><th>LinkedIn Job ID</th><th>Job Link</th><th>Title</th><th>Open Date</th><th>Close Date</th><th>Certs</th><th>Description</th></tr></thead>
+        <thead><tr><th>LinkedIn Job ID</th><th>Job Link</th><th>Title</th><th>Open Date</th><th>Close Date</th><th>Certs</th><th>Description</th><th>Cover Letter</th></tr></thead>
         <tbody id="jobs-body">
           {% for row in job.scraped_jobs %}
           <tr>
@@ -71,9 +71,10 @@
             <td>{{ row.close_date }}</td>
             <td>{{ row.certs }}</td>
             <td title="{{ row.description }}">{{ row.description[:150] }}{% if row.description|length > 150 %}…{% endif %}</td>
+            <td><a href="/job/{{ job.id }}/cover-letter/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">View Cover Letter</a></td>
           </tr>
           {% else %}
-          <tr><td colspan="7">No scraped jobs yet.</td></tr>
+          <tr><td colspan="8">No scraped jobs yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -126,7 +127,7 @@
 
     function renderScrapedJobs(rows) {
       if (!rows || rows.length === 0) {
-        jobsBody.innerHTML = "<tr><td colspan='7'>No scraped jobs yet.</td></tr>";
+        jobsBody.innerHTML = "<tr><td colspan='8'>No scraped jobs yet.</td></tr>";
         return;
       }
       jobsBody.innerHTML = rows
@@ -135,6 +136,7 @@
           const shortDesc = desc.length > 150 ? desc.slice(0, 150) + "\u2026" : desc;
           const escapedDesc = desc.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
           const escapedShort = shortDesc.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const coverUrl = `/job/${jobId}/cover-letter/${r.job_id}`;
           return `<tr>
             <td><a href="https://www.linkedin.com/jobs/view/${r.job_id}" target="_blank" rel="noopener noreferrer">${r.job_id}</a></td>
             <td><a href="https://www.linkedin.com/jobs/view/${r.job_id}" target="_blank" rel="noopener noreferrer">Open</a></td>
@@ -143,6 +145,7 @@
             <td>${r.close_date || ""}</td>
             <td>${r.certs || ""}</td>
             <td title="${escapedDesc}">${escapedShort}</td>
+            <td><a href="${coverUrl}" target="_blank" rel="noopener noreferrer">View Cover Letter</a></td>
           </tr>`;
         })
         .join("");

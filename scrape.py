@@ -147,6 +147,12 @@ common_certs = [
 ]
 
 
+def cert_appears_as_token(page_text_upper, cert_name):
+	"""Return True when cert_name appears as a standalone token in page text."""
+	pattern = rf"(?<![A-Z0-9]){re.escape(cert_name.upper())}(?![A-Z0-9])"
+	return re.search(pattern, page_text_upper) is not None
+
+
 try:
 	#keyword 'cybersecurity' located 'remote'
 	#cyber_url = 'https://www.linkedin.com/jobs/search?keywords=Cybersecurity&location=remote&geoId=&trk=public_jobs_jobs-search-bar_search-submit&position=1&pageNum=0'
@@ -416,7 +422,7 @@ try:
 
 			# Fallback: match commonly requested cert names directly from full page text.
 			for cert_name in common_certs:
-				if cert_name in page_text_upper:
+				if cert_appears_as_token(page_text_upper, cert_name):
 					foundcert = True
 					jd_certs.add(cert_name)
 					write_csv(parsed.output, j_id, j_title, cert_name)

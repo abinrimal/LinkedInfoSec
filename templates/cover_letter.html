@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cover Letter - {{ row.job_id }}</title>
+  <style>
+    body { font-family: Georgia, serif; margin: 0; background: #f7f4ef; color: #1f2933; }
+    .wrap { width: min(96vw, 1600px); margin: 24px auto; padding: 0 18px; }
+    .card { background: #fff; border: 1px solid #e4ddd1; border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+    h1, h2 { margin-top: 0; }
+    a { color: #005f73; }
+    .meta { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .chip { display: inline-block; border: 1px solid #c8bca9; border-radius: 999px; padding: 4px 10px; margin: 4px 6px 0 0; font-size: 13px; background: #f8f5f0; }
+    ul { margin: 8px 0 0 20px; }
+    pre { background: #f3efe8; border-radius: 10px; padding: 14px; white-space: pre-wrap; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <p><a href="/job/{{ job.id }}">Back to Job</a></p>
+      <h1>Sample Cover Letter (APA Style)</h1>
+      <div class="meta">
+        <div><strong>LinkedIn Job ID:</strong> {{ row.job_id }}</div>
+        <div><strong>Title:</strong> {{ row.title }}</div>
+        <div><strong>Open Date:</strong> {{ row.open_date or 'N/A' }}</div>
+        <div><strong>Close Date:</strong> {{ row.close_date or 'N/A' }}</div>
+      </div>
+      <p><a href="https://www.linkedin.com/jobs/view/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">Open LinkedIn Job</a></p>
+    </div>
+
+    <div class="card">
+      <h2>Tags</h2>
+      {% if row.tags %}
+        {% for tag in row.tags %}
+          <span class="chip">{{ tag }}</span>
+        {% endfor %}
+      {% else %}
+        <p>No strong domain tags were extracted from this description.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Relevant Criteria From Description</h2>
+      {% if row.criteria %}
+        <ul>
+          {% for c in row.criteria %}
+            <li>{{ c }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No explicit criteria signals were found in the description text.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Cover Letter</h2>
+      <pre>{{ row.cover_letter }}</pre>
+    </div>
+  </div>
+</body>
+</html>
