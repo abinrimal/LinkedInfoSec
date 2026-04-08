@@ -511,6 +511,29 @@ def _build_resume(row, candidate):
     location = candidate.get("location", "Sydney, Australia")
     additional_notes = candidate.get("additional_notes", "Strong problem-solving and collaborative mindset")
 
+    exp_text = " ".join(experience.split()).strip()
+    years_match = re.search(r"(\d+\+?)\s*years", exp_text.lower())
+    years_text = f"over {years_match.group(1)} years" if years_match else "several years"
+
+    # Extract profile skills from candidate experience text and align with JD skills.
+    profile_skill_patterns = {
+        "Python": r"\bpython\b",
+        "Django": r"\bdjango\b",
+        "Laravel": r"\blaravel\b",
+        "DevOps": r"\bdevops\b|\bcicd\b|\bkubernetes\b|\bdocker\b",
+        "WordPress": r"\bwordpress\b",
+        "Shopify": r"\bshopify\b",
+        "Cloud": r"\baws\b|\bazure\b|\bgcp\b|cloud",
+        "Accounting Systems": r"xero|myob|quickbooks|erp",
+        "Reconciliation": r"reconciliation|reconcile",
+        "Financial Reporting": r"financial\s+reporting|month-end|month\s+end",
+        "Stakeholder Communication": r"stakeholder|communication|cross-functional",
+        "Leadership": r"leadership|team\s+lead|management",
+    }
+    profile_skills = [
+        name for name, pattern in profile_skill_patterns.items() if re.search(pattern, exp_text.lower())
+    ]
+
     title_lower = title.lower()
     is_finance_role = any(word in title_lower for word in ["accountant", "account", "finance", "bookkeeper", "payroll", "ap", "ar"])
     is_security_role = any(word in title_lower for word in ["cyber", "security", "soc", "threat", "grc"]) or any(
@@ -520,6 +543,11 @@ def _build_resume(row, candidate):
     ats_keywords = list(dict.fromkeys((key_skills + tags)[:12]))
     if not ats_keywords:
         ats_keywords = ["Problem Solving", "Communication", "Stakeholder Management"]
+
+    # Prioritize overlap between candidate profile and JD-derived ATS keywords.
+    matched_ats = [k for k in ats_keywords if any(k.lower() in s.lower() for s in profile_skills + [exp_text])]
+    if not matched_ats:
+        matched_ats = ats_keywords[:4]
 
     reqs = [_clean_requirement_text(c) for c in criteria if _clean_requirement_text(c)]
     if reqs:
@@ -534,43 +562,46 @@ def _build_resume(row, candidate):
 
     if is_finance_role:
         summary = (
-            f"Detail-oriented professional with {experience}, targeting {title}. Proven ability to improve financial accuracy, "
-            f"support month-end processes, and deliver timely reporting in fast-paced environments. Skilled at applying controls, "
-            f"resolving reconciliation issues, and collaborating with cross-functional teams to support compliant, data-driven decisions."
+            f"Detail-oriented professional with {years_text} of experience delivering accurate and timely finance outcomes in fast-paced environments. "
+            f"I bring practical capability in {', '.join(matched_ats[:3])}, with a strong focus on reconciliation quality, month-end reliability, and clear reporting. "
+            f"My background combines hands-on execution with stakeholder collaboration, enabling me to resolve discrepancies quickly and maintain compliance standards. "
+            f"I am prepared to contribute immediate value in the {title} role by improving data integrity, process consistency, and decision-ready financial insights."
         )
         work_bullets = [
-            f"Supported finance operations with a focus on {req_summary}, improving processing reliability and turnaround time.",
-            "Improved data quality by reconciling records, identifying anomalies early, and documenting corrective actions for repeatability.",
-            "Partnered with operational and leadership stakeholders to provide clear status updates and practical recommendations.",
-            "Contributed to reporting workflows and process improvements that reduced rework and strengthened audit readiness.",
+            f"Applied {exp_text} to support finance operations aligned with {req_summary}, improving processing reliability and turnaround time.",
+            f"Used {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to improve reconciliation accuracy and reduce month-end rework.",
+            "Partnered with operational and leadership stakeholders to provide clear status updates, risk visibility, and practical recommendations.",
+            "Contributed to reporting and control improvements that strengthened audit readiness and supported compliant, data-driven decisions.",
         ]
-        skills = list(dict.fromkeys(ats_keywords + ["Reconciliation", "Financial Reporting", "Attention to Detail"]))[:12]
+        skills = list(dict.fromkeys(matched_ats + profile_skills + ["Reconciliation", "Financial Reporting", "Attention to Detail"]))[:12]
     elif is_security_role:
         summary = (
-            f"Security-focused professional with {experience}, targeting {title}. Experienced in translating risk and operational needs "
-            f"into practical controls, response actions, and measurable outcomes. Strong at balancing technical execution with stakeholder "
-            f"communication to improve resilience and delivery quality."
+            f"Security-focused professional with {years_text} of practical delivery experience across high-priority operational environments. "
+            f"My work emphasizes {', '.join(matched_ats[:3])}, translating risk and incident signals into clear, actionable controls and response outcomes. "
+            f"I combine technical execution with stakeholder communication to improve resilience, reduce operational friction, and maintain delivery quality. "
+            f"For the {title} role, I offer strong ownership, clear documentation, and rapid alignment with team priorities."
         )
         work_bullets = [
-            f"Delivered outcomes aligned to {req_summary}, improving consistency and response quality across security operations.",
-            "Analyzed events and operational signals to prioritize actions, reduce noise, and support timely risk treatment.",
-            "Created clear documentation and handover artifacts that improved team alignment and accelerated onboarding.",
+            f"Applied {exp_text} to deliver outcomes aligned to {req_summary}, improving consistency and response quality across security operations.",
+            f"Leveraged {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to prioritize actionable findings and support timely risk treatment.",
+            "Created clear documentation and handover artifacts that improved team alignment, knowledge transfer, and onboarding speed.",
             "Collaborated across teams to embed practical security improvements without slowing delivery velocity.",
         ]
-        skills = list(dict.fromkeys(ats_keywords + ["Risk Reduction", "Incident Coordination", "Security Documentation"]))[:12]
+        skills = list(dict.fromkeys(matched_ats + profile_skills + ["Risk Reduction", "Incident Coordination", "Security Documentation"]))[:12]
     else:
         summary = (
-            f"Results-driven professional with {experience}, targeting {title}. Known for translating requirements into structured execution, "
-            f"maintaining delivery momentum, and producing high-quality outcomes across cross-functional teams. Strong communicator with "
-            f"a focus on measurable impact and continuous improvement."
+            f"Results-driven professional with {years_text} of experience delivering structured outcomes in dynamic, cross-functional environments. "
+            f"I bring practical strength in {', '.join(matched_ats[:3])}, converting requirements into executable plans and measurable progress. "
+            f"My approach combines analytical problem solving, stakeholder communication, and disciplined follow-through to keep initiatives on track. "
+            f"In the {title} role, I can contribute quickly by aligning delivery decisions with business priorities and quality expectations."
         )
         work_bullets = [
-            f"Executed priorities aligned with {req_summary}, ensuring reliable delivery and measurable progress against objectives.",
-            "Applied strong analytical and problem-solving skills to unblock issues quickly and keep timelines on track.",
+            f"Applied {exp_text} to execute priorities aligned with {req_summary}, ensuring reliable delivery and measurable progress.",
+            f"Used {', '.join(matched_ats[:2]) if len(matched_ats) >= 2 else matched_ats[0]} to unblock issues quickly and maintain delivery momentum.",
             "Worked with technical and non-technical stakeholders to clarify expectations, risks, and dependencies early.",
             "Improved process clarity through concise documentation, reusable templates, and proactive status communication.",
         ]
-        skills = list(dict.fromkeys(ats_keywords + ["Execution", "Stakeholder Communication", "Process Improvement"]))[:12]
+        skills = list(dict.fromkeys(matched_ats + profile_skills + ["Execution", "Stakeholder Communication", "Process Improvement"]))[:12]
 
     notes_items = [n.strip() for n in additional_notes.split(",") if n.strip()]
     if not notes_items:
@@ -596,7 +627,6 @@ def _build_resume(row, candidate):
         ],
         "skills": skills,
         "additional_notes": notes_items,
-        "ats_keywords": ats_keywords,
     }
 
 
