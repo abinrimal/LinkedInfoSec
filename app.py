@@ -495,6 +495,111 @@ def _build_cover_letter(row, candidate):
     )
 
 
+def _build_resume(row, candidate):
+    """Build a structured, job-tailored resume payload for template rendering."""
+    title = row.get("title") or "Target Role"
+    tags = row.get("tags") or []
+    criteria = row.get("criteria") or []
+    description = row.get("description") or ""
+    key_skills = _extract_key_skills(description, criteria)
+
+    name = candidate.get("name", "Applicant Name")
+    email = candidate.get("email", "applicant@example.com")
+    phone = candidate.get("phone", "+00 000 000 000")
+    experience = candidate.get("experience", "Relevant professional experience")
+    education = candidate.get("education", "Relevant qualification")
+    location = candidate.get("location", "Sydney, Australia")
+    additional_notes = candidate.get("additional_notes", "Strong problem-solving and collaborative mindset")
+
+    title_lower = title.lower()
+    is_finance_role = any(word in title_lower for word in ["accountant", "account", "finance", "bookkeeper", "payroll", "ap", "ar"])
+    is_security_role = any(word in title_lower for word in ["cyber", "security", "soc", "threat", "grc"]) or any(
+        "security" in tag.lower() for tag in tags
+    )
+
+    ats_keywords = list(dict.fromkeys((key_skills + tags)[:12]))
+    if not ats_keywords:
+        ats_keywords = ["Problem Solving", "Communication", "Stakeholder Management"]
+
+    reqs = [_clean_requirement_text(c) for c in criteria if _clean_requirement_text(c)]
+    if reqs:
+        if len(reqs) == 1:
+            req_summary = reqs[0]
+        elif len(reqs) == 2:
+            req_summary = f"{reqs[0]} and {reqs[1]}"
+        else:
+            req_summary = f"{reqs[0]}, {reqs[1]}, and {reqs[2]}"
+    else:
+        req_summary = "delivery ownership, stakeholder communication, and problem solving"
+
+    if is_finance_role:
+        summary = (
+            f"Detail-oriented professional with {experience}, targeting {title}. Proven ability to improve financial accuracy, "
+            f"support month-end processes, and deliver timely reporting in fast-paced environments. Skilled at applying controls, "
+            f"resolving reconciliation issues, and collaborating with cross-functional teams to support compliant, data-driven decisions."
+        )
+        work_bullets = [
+            f"Supported finance operations with a focus on {req_summary}, improving processing reliability and turnaround time.",
+            "Improved data quality by reconciling records, identifying anomalies early, and documenting corrective actions for repeatability.",
+            "Partnered with operational and leadership stakeholders to provide clear status updates and practical recommendations.",
+            "Contributed to reporting workflows and process improvements that reduced rework and strengthened audit readiness.",
+        ]
+        skills = list(dict.fromkeys(ats_keywords + ["Reconciliation", "Financial Reporting", "Attention to Detail"]))[:12]
+    elif is_security_role:
+        summary = (
+            f"Security-focused professional with {experience}, targeting {title}. Experienced in translating risk and operational needs "
+            f"into practical controls, response actions, and measurable outcomes. Strong at balancing technical execution with stakeholder "
+            f"communication to improve resilience and delivery quality."
+        )
+        work_bullets = [
+            f"Delivered outcomes aligned to {req_summary}, improving consistency and response quality across security operations.",
+            "Analyzed events and operational signals to prioritize actions, reduce noise, and support timely risk treatment.",
+            "Created clear documentation and handover artifacts that improved team alignment and accelerated onboarding.",
+            "Collaborated across teams to embed practical security improvements without slowing delivery velocity.",
+        ]
+        skills = list(dict.fromkeys(ats_keywords + ["Risk Reduction", "Incident Coordination", "Security Documentation"]))[:12]
+    else:
+        summary = (
+            f"Results-driven professional with {experience}, targeting {title}. Known for translating requirements into structured execution, "
+            f"maintaining delivery momentum, and producing high-quality outcomes across cross-functional teams. Strong communicator with "
+            f"a focus on measurable impact and continuous improvement."
+        )
+        work_bullets = [
+            f"Executed priorities aligned with {req_summary}, ensuring reliable delivery and measurable progress against objectives.",
+            "Applied strong analytical and problem-solving skills to unblock issues quickly and keep timelines on track.",
+            "Worked with technical and non-technical stakeholders to clarify expectations, risks, and dependencies early.",
+            "Improved process clarity through concise documentation, reusable templates, and proactive status communication.",
+        ]
+        skills = list(dict.fromkeys(ats_keywords + ["Execution", "Stakeholder Communication", "Process Improvement"]))[:12]
+
+    notes_items = [n.strip() for n in additional_notes.split(",") if n.strip()]
+    if not notes_items:
+        notes_items = [additional_notes.strip()] if additional_notes.strip() else ["Strong ownership and collaborative working style"]
+
+    return {
+        "target_role": title,
+        "contact": {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "location": location,
+        },
+        "professional_summary": summary,
+        "education": education,
+        "work_experience": [
+            {
+                "role": "Relevant Professional Experience",
+                "company": "Various Organizations",
+                "dates": "Recent Years",
+                "bullets": work_bullets,
+            }
+        ],
+        "skills": skills,
+        "additional_notes": notes_items,
+        "ats_keywords": ats_keywords,
+    }
+
+
 def _parse_allinfo_rows(job, max_rows=400):
     """Parse *_allinfo.csv and return a list of scraped-job dicts.
 
@@ -697,8 +802,9 @@ def cover_letter_page(job_id, linkedin_job_id):
     }
     target = dict(target)
     target["cover_letter"] = _build_cover_letter(target, candidate)
+    resume = _build_resume(target, candidate)
 
-    return render_template("cover_letter.html", job=job, row=target, candidate=candidate)
+    return render_template("cover_letter.html", job=job, row=target, candidate=candidate, resume=resume)
 
 
 @app.route("/api/job/<job_id>")
