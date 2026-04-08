@@ -17,9 +17,38 @@ Current state:
 - Core scraping + parsing + Flask UI are working.
 - Resume/cover-letter generation is integrated in the web app.
 - CSV download outputs include richer job metadata for review/export workflows.
+- Closeout tag created: v1.0-closeout-2026-04-08 (commit 5005519).
 
 When resuming later, start by pulling latest `main`, re-running a quick scrape,
 and validating output formats before adding new features.
+
+## Closeout Checklist
+
+- Repository clean before close (runtime DB drift removed).
+- Main branch pushed and synchronized with origin.
+- Annotated release checkpoint tag pushed: v1.0-closeout-2026-04-08.
+- README updated with current CSV schema and paused-project state.
+
+## Resume Later
+
+1. Fetch latest refs and tags:
+
+```bash
+git fetch --all --tags
+```
+
+2. Start from the closeout checkpoint (new branch recommended):
+
+```bash
+git checkout -b resume-work v1.0-closeout-2026-04-08
+```
+
+3. Activate environment and run quick validation:
+
+```bash
+source .env/bin/activate
+python app.py
+```
 
 ## Quick Start (macOS/Linux)
 
