@@ -408,6 +408,36 @@ def _build_cover_letter(row, candidate):
     location = candidate.get("location", "Sydney, Australia")
     additional_notes = candidate.get("additional_notes", "Strong problem-solving and collaborative mindset")
 
+    years_match = re.search(r"(\d+\+?)\s*years", experience.lower())
+    years_text = f"over {years_match.group(1)} years" if years_match else "several years"
+
+    # Build a role-relevant skill summary from overlap with extracted job skills.
+    exp_lower = experience.lower()
+    matched_profile_skills = [skill for skill in key_skills if skill.lower() in exp_lower]
+    if not matched_profile_skills:
+        matched_profile_skills = key_skills[:3] if key_skills else tags[:3]
+    if matched_profile_skills:
+        if len(matched_profile_skills) == 1:
+            profile_skills_text = matched_profile_skills[0]
+        elif len(matched_profile_skills) == 2:
+            profile_skills_text = f"{matched_profile_skills[0]} and {matched_profile_skills[1]}"
+        else:
+            profile_skills_text = ", ".join(matched_profile_skills[:2]) + f", and {matched_profile_skills[2]}"
+    else:
+        profile_skills_text = "execution, collaboration, and pragmatic problem solving"
+
+    education_phrase = " ".join(education.split()).strip(" .")
+    if education_phrase:
+        education_context = f"My academic foundation in {education_phrase} supports a structured approach to analysis, prioritization, and decision-making"
+    else:
+        education_context = "My academic background supports a structured approach to analysis, prioritization, and decision-making"
+
+    notes_phrase = " ".join(additional_notes.split()).strip(" .")
+    if notes_phrase:
+        notes_context = f"I also bring {notes_phrase.lower()}, which helps me align teams and maintain momentum through ambiguity"
+    else:
+        notes_context = "I also bring strong ownership and communication habits, which help maintain momentum through ambiguity"
+
     title_lower = title.lower()
     is_security_role = any(word in title_lower for word in ["cyber", "security", "soc", "threat", "grc", "iso 27001"]) or any(
         "security" in tag.lower() for tag in tags
@@ -449,11 +479,11 @@ def _build_cover_letter(row, candidate):
         f"[Company Address]\n\n"
         f"Subject: Application for {title}\n\n"
         f"Dear Hiring Manager,\n\n"
-        f"I am pleased to apply for the {title} position. With {experience} and {education}, I have developed a practical, "
+        f"I am pleased to apply for the {title} position. With {years_text} of hands-on delivery experience, I have developed a practical, "
         f"results-focused approach to delivering high-quality outcomes in dynamic environments. I am motivated by the opportunity "
         f"to contribute in {location} and support your team with dependable execution, clear communication, and strong accountability from the outset.\n\n"
-        f"My recent work has required me to apply skills such as {skills_line}, while consistently balancing technical depth with business priorities. "
-        f"This experience has strengthened my ability to work across {tag_line} and align delivery with organizational goals. {additional_notes}. "
+        f"My recent work has required me to apply skills such as {skills_line}, with particular depth in {profile_skills_text}, while consistently balancing technical depth with business priorities. "
+        f"This experience has strengthened my ability to work across {tag_line} and align delivery with organizational goals. {education_context}. {notes_context}. "
         f"As reflected in your job description, the role emphasizes {requirements_prose}, and these are areas where I have demonstrated consistent performance.\n\n"
         f"Beyond role fit, I would bring immediate value through {focus_phrase}. {impact_line}. I am comfortable taking ownership of complex tasks, "
         f"collaborating across teams, and maintaining momentum from planning through execution. I also prioritize clean documentation and transparent updates "
