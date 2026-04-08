@@ -73,13 +73,15 @@ def write_results_to_file(filename, j_id, j_title, j_certs, j_desc="", j_open_da
 		writer.writerow([j_id[0], j_title[0], str(j_certs), j_desc, j_open_date, j_close_date])
 
 def write_csv(filename, j_id, j_title, cert):
-	"""Append one flat (job_id, title, cert) row to *_data.csv.
+	"""Append one flat (job_id, title, cert, job_url) row to *_data.csv.
 
 	This file has one row per cert per job, making it easy to pivot or filter
 	in Excel / pandas without expanding sets.
 	"""
-	with open(f'{filename}_data.csv', 'a+') as f:
-		f.write(f'{j_id},{j_title},{cert}\n')
+	job_url = f"https://www.linkedin.com/jobs/view/{j_id}"
+	with open(f'{filename}_data.csv', 'a+', newline='') as f:
+		writer = csv.writer(f)
+		writer.writerow([j_id, j_title, cert, job_url])
 		
 def store_dict(filename, dic):
 	"""Write a certification-count dict to *_certs.csv.
