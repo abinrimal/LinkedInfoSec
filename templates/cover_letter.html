@@ -16,6 +16,11 @@
     .chip { display: inline-block; border: 1px solid #c8bca9; border-radius: 999px; padding: 4px 10px; margin: 4px 6px 0 0; font-size: 13px; background: #f8f5f0; }
     ul { margin: 8px 0 0 20px; }
     pre { background: #f3efe8; border-radius: 10px; padding: 14px; white-space: pre-wrap; line-height: 1.5; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    label { display: block; font-size: 13px; margin-bottom: 4px; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #c8bca9; }
+    textarea { min-height: 90px; resize: vertical; }
+    button { margin-top: 8px; padding: 10px 14px; border: 0; border-radius: 10px; background: #005f73; color: #fff; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -34,6 +39,44 @@
         <div><strong>Close Date:</strong> {{ row.close_date or 'N/A' }}</div>
       </div>
       <p><a href="https://www.linkedin.com/jobs/view/{{ row.job_id }}" target="_blank" rel="noopener noreferrer">Open LinkedIn Job</a></p>
+    </div>
+
+    <div class="card">
+      <h2>Candidate Profile</h2>
+      <p>Update these details, then click Generate to tailor the letter for this specific role.</p>
+      <form method="get" action="/job/{{ job.id }}/cover-letter/{{ row.job_id }}">
+        <div class="grid">
+          <div>
+            <label>Name</label>
+            <input name="name" value="{{ candidate.name }}" required>
+          </div>
+          <div>
+            <label>Email</label>
+            <input name="email" value="{{ candidate.email }}" required>
+          </div>
+          <div>
+            <label>Phone</label>
+            <input name="phone" value="{{ candidate.phone }}" required>
+          </div>
+          <div>
+            <label>Location</label>
+            <input name="location" value="{{ candidate.location }}" required>
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label>Experience</label>
+            <textarea name="experience" required>{{ candidate.experience }}</textarea>
+          </div>
+          <div>
+            <label>Education</label>
+            <input name="education" value="{{ candidate.education }}" required>
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label>Additional Notes</label>
+            <textarea name="additional_notes">{{ candidate.additional_notes }}</textarea>
+          </div>
+        </div>
+        <button type="submit">Generate Tailored Cover Letter</button>
+      </form>
     </div>
 
     <div class="card">

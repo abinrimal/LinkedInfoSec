@@ -365,12 +365,42 @@ def _extract_tags_and_criteria(description):
     return tags[:8], criteria
 
 
-def _build_cover_letter(row):
-    """Build an APA-style sample cover letter from parsed job row metadata."""
+def _extract_key_skills(description, criteria):
+    """Extract key skill keywords from description and criteria text."""
+    text = f"{description} {' '.join(criteria)}".lower()
+    skill_patterns = {
+        "Python": r"\bpython\b",
+        "Django": r"\bdjango\b",
+        "Laravel": r"\blaravel\b",
+        "DevOps": r"\bdevops\b|\bcicd\b|\bkubernetes\b|\bdocker\b",
+        "Cloud": r"\baws\b|\bazure\b|\bgcp\b|cloud",
+        "WordPress": r"\bwordpress\b",
+        "Shopify": r"\bshopify\b",
+        "SIEM": r"\bsiem\b|\bsplunk\b|\bqradar\b|\bsentinel\b",
+        "Incident Response": r"incident\s+response|\bdfir\b|threat\s+hunting",
+        "Risk & Compliance": r"\bgrc\b|risk\s+management|compliance|iso\s*27001|nist",
+        "Communication": r"communication|stakeholder|collaboration",
+        "Leadership": r"leadership|lead|mentor|management",
+    }
+    skills = [name for name, pattern in skill_patterns.items() if re.search(pattern, text)]
+    return skills[:10]
+
+
+def _build_cover_letter(row, candidate):
+    """Build a professional 300-400 word cover letter tailored to the role."""
     title = row.get("title") or "Cybersecurity Role"
     tags = row.get("tags") or []
     criteria = row.get("criteria") or []
     description = (row.get("description") or "").lower()
+    key_skills = _extract_key_skills(row.get("description", ""), criteria)
+
+    name = candidate.get("name", "Applicant Name")
+    email = candidate.get("email", "applicant@example.com")
+    phone = candidate.get("phone", "+00 000 000 000")
+    experience = candidate.get("experience", "Relevant professional experience")
+    education = candidate.get("education", "Relevant qualification")
+    location = candidate.get("location", "Sydney, Australia")
+    additional_notes = candidate.get("additional_notes", "Strong problem-solving and collaborative mindset")
 
     title_lower = title.lower()
     is_security_role = any(word in title_lower for word in ["cyber", "security", "soc", "threat", "grc", "iso 27001"]) or any(
@@ -401,29 +431,33 @@ def _build_cover_letter(row):
         fallback_criteria = "- Demonstrated role-relevant delivery skills and clear communication"
 
     tag_line = ", ".join(tags) if tags else "Stakeholder Communication, Execution, Problem Solving"
+    skills_line = ", ".join(key_skills) if key_skills else "problem solving, communication, and delivery excellence"
     criteria_line = "\n".join([f"- {c}" for c in criteria[:4]]) if criteria else fallback_criteria
 
     return (
-        f"[Applicant Name]\n"
-        f"[Street Address]\n"
-        f"[City, State, Postcode]\n"
-        f"[Email Address] | [Phone Number]\n\n"
+        f"{name}\n"
+        f"{location}\n"
+        f"{email} | {phone}\n\n"
         f"{datetime.utcnow().strftime('%B %d, %Y')}\n\n"
         f"Hiring Manager\n"
         f"[Company Name]\n"
         f"[Company Address]\n\n"
         f"Subject: Application for {title}\n\n"
         f"Dear Hiring Manager,\n\n"
-        f"I am writing to apply for the {title} role. {profile_line} {tag_line}, aligns with the priorities outlined in your posting. "
-        f"{contribution_line}\n\n"
+        f"I am writing to express my interest in the {title} role. With {experience}, and {education}, "
+        f"I bring a practical and outcome-focused approach that aligns well with the responsibilities in your posting. "
+        f"Based in {location}, I am excited by the opportunity to contribute to your team and support high-quality delivery from day one.\n\n"
+        f"Across recent projects, I have applied key skills including {skills_line}. {profile_line} {tag_line}, "
+        f"which directly supports the needs highlighted in this role. {additional_notes}. {contribution_line}\n\n"
         f"From your description, the highest-value criteria appear to be:\n"
         f"{criteria_line}\n\n"
-        f"{impact_line} I am confident this mix of hands-on execution and communication can help your team "
-        f"move efficiently from requirements to measurable outcomes.\n\n"
+        f"{impact_line} I am confident this combination of technical execution, collaboration, and ownership "
+        f"can help your team move efficiently from requirements to measurable outcomes. I also focus on clear documentation, "
+        f"proactive communication, and continuous improvement so stakeholders remain aligned throughout delivery.\n\n"
         f"I would welcome a first screening phone call to discuss how my experience maps to your current needs and how "
         f"I can support rapid onboarding into this position. Thank you for your consideration.\n\n"
         f"Sincerely,\n"
-        f"[Applicant Name]"
+        f"{name}"
     )
 
 
@@ -468,7 +502,7 @@ def _parse_allinfo_rows(job, max_rows=400):
                     "tags": tags,
                     "criteria": criteria,
                 }
-                parsed_row["cover_letter"] = _build_cover_letter(parsed_row)
+                parsed_row["cover_letter"] = ""
                 rows.append({
                     **parsed_row
                 })
@@ -618,7 +652,19 @@ def cover_letter_page(job_id, linkedin_job_id):
     if not target:
         abort(404)
 
-    return render_template("cover_letter.html", job=job, row=target)
+    candidate = {
+        "name": (request.args.get("name", "") or "Abin Rimal").strip(),
+        "email": (request.args.get("email", "") or "abinrimal7@gmail.com").strip(),
+        "phone": (request.args.get("phone", "") or "+61 040 343 079").strip(),
+        "experience": (request.args.get("experience", "") or "7+ years in software development, skilled in Python, Laravel, Django, DevOps, WordPress, Shopify").strip(),
+        "education": (request.args.get("education", "") or "Master's in IT").strip(),
+        "location": (request.args.get("location", "") or "Sydney, Australia").strip(),
+        "additional_notes": (request.args.get("additional_notes", "") or "Strong problem-solving, team leadership, and project management experience").strip(),
+    }
+    target = dict(target)
+    target["cover_letter"] = _build_cover_letter(target, candidate)
+
+    return render_template("cover_letter.html", job=job, row=target, candidate=candidate)
 
 
 @app.route("/api/job/<job_id>")
