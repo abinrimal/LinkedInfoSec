@@ -9,6 +9,18 @@
 
 The LinkedInfoSec project was born from the desire to identify exactly which certifications prospective employers are looking for right now. The tool datascrapes LinkedIn's public-facing job search endpoint for job listings that contain certifications, then outputs .CSV formatted files with all of the information it grabs.
 
+## Project Status
+
+This project is currently paused for later continuation.
+
+Current state:
+- Core scraping + parsing + Flask UI are working.
+- Resume/cover-letter generation is integrated in the web app.
+- CSV download outputs include richer job metadata for review/export workflows.
+
+When resuming later, start by pulling latest `main`, re-running a quick scrape,
+and validating output formats before adding new features.
+
 ## Quick Start (macOS/Linux)
 
 1. Create and activate a virtual environment:
@@ -58,7 +70,11 @@ The following flags may be passed to scrape.py to tailor your results:
 * **-b** or **--browser**: Browser to run with (`firefox` or `chrome`). Default is `firefox`. Example **python3 scrape.py -b chrome**
 * **--keep-open**: Keep browser open after the script finishes. Useful for debugging page state. Example **python3 scrape.py -b chrome --keep-open**
 
-Regardless of whether you specify a name for the outfile with (-o), the script puts out a .csv file with the results of the scrape, including the given LinkedIn jobID, job title, and the certs (if any) that were found to that post.
+Regardless of whether you specify a name for the outfile with (-o), the script writes multiple CSV artifacts:
+
+- `<output>_allinfo.csv` columns: `job_id`, `title`, `certs_set`, `description`, `open_date`, `close_date`
+- `<output>_data.csv` columns: `job_id`, `title`, `cert`, `job_url`, `open_date`, `close_date`, `certs`, `description`
+- `<output>_all_certs.csv` / `<output>_certs.csv`: aggregated cert counts
 
 You can then output a sorted list of certifications by count by running **handle.py -f <file_allinfo.csv>**.
 

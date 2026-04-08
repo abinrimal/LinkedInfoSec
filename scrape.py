@@ -72,16 +72,17 @@ def write_results_to_file(filename, j_id, j_title, j_certs, j_desc="", j_open_da
 		writer = csv.writer(f)
 		writer.writerow([j_id[0], j_title[0], str(j_certs), j_desc, j_open_date, j_close_date])
 
-def write_csv(filename, j_id, j_title, cert):
-	"""Append one flat (job_id, title, cert, job_url) row to *_data.csv.
+def write_csv(filename, j_id, j_title, cert, j_open_date="", j_close_date="", j_certs="", j_desc=""):
+	"""Append one flat row to *_data.csv with job metadata and cert context.
 
-	This file has one row per cert per job, making it easy to pivot or filter
-	in Excel / pandas without expanding sets.
+	Columns: job_id, title, cert, job_url, open_date, close_date, certs, description.
+	Each row still represents one cert per job, while keeping key listing context
+	for direct CSV downloads and spreadsheet review.
 	"""
 	job_url = f"https://www.linkedin.com/jobs/view/{j_id}"
 	with open(f'{filename}_data.csv', 'a+', newline='') as f:
 		writer = csv.writer(f)
-		writer.writerow([j_id, j_title, cert, job_url])
+		writer.writerow([j_id, j_title, cert, job_url, j_open_date, j_close_date, j_certs, j_desc])
 		
 def store_dict(filename, dic):
 	"""Write a certification-count dict to *_certs.csv.
@@ -416,8 +417,6 @@ try:
 						#csvset = (matchin)
 						foundcert = True
 
-						for cred in set(matching_words):
-							write_csv(parsed.output, j_id, j_title, cred)
 						jd_certs.update(matching_words)
 
 			# Fallback: match commonly requested cert names directly from full page text.
@@ -425,10 +424,16 @@ try:
 				if cert_appears_as_token(page_text_upper, cert_name):
 					foundcert = True
 					jd_certs.add(cert_name)
-					write_csv(parsed.output, j_id, j_title, cert_name)
 		else:
 			#print(f"Failed to retrieve the page. Status code: {response.status_code}")
 			pass
+
+		# Write _data.csv rows after cert collection is complete so each row can
+		# include full listing context (dates, certs set, and description).
+		if jd_certs:
+			certs_text = str(jd_certs)
+			for cert_name in sorted(jd_certs):
+				write_csv(parsed.output, j_id, j_title, cert_name, j_open_date, j_close_date, certs_text, j_desc)
 
 		"""if (jd_certs == set()):
 			no_certs += 1
