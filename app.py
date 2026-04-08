@@ -386,6 +386,12 @@ def _extract_key_skills(description, criteria):
     return skills[:10]
 
 
+def _clean_requirement_text(text):
+    """Normalize requirement fragments so they read naturally in prose."""
+    cleaned = " ".join((text or "").split()).strip(" .;:-")
+    return cleaned[:140]
+
+
 def _build_cover_letter(row, candidate):
     """Build a professional 300-400 word cover letter tailored to the role."""
     title = row.get("title") or "Cybersecurity Role"
@@ -408,31 +414,30 @@ def _build_cover_letter(row, candidate):
     ) or any(word in description for word in ["cyber", "security", "incident response", "siem", "vulnerability"])
 
     if is_security_role:
-        profile_line = (
-            "My background in cybersecurity operations and risk reduction, combined with practical "
-            "delivery across"
-        )
-        contribution_line = "I can contribute quickly, collaborate effectively, and help the team improve security outcomes from day one."
+        focus_phrase = "secure-by-design delivery, risk reduction, and reliable incident-ready operations"
         impact_line = (
-            "In comparable roles, I have supported detection and response workflows, improved analyst-ready "
-            "documentation, and translated technical findings into clear recommendations for stakeholders."
+            "In comparable roles, I have strengthened monitoring and response outcomes, improved documentation quality, "
+            "and translated technical findings into practical actions for business stakeholders"
         )
-        fallback_criteria = "- Demonstrated cybersecurity fundamentals and clear communication skills"
     else:
-        profile_line = (
-            "My professional background and execution-focused project delivery, combined with practical "
-            "experience across"
-        )
-        contribution_line = "I can contribute quickly, collaborate effectively, and help the team deliver reliable outcomes from day one."
+        focus_phrase = "structured execution, delivery quality, and measurable business outcomes"
         impact_line = (
-            "In comparable roles, I have delivered measurable outcomes through structured execution, "
-            "cross-functional collaboration, and clear stakeholder communication."
+            "In comparable roles, I have delivered measurable results through disciplined execution, cross-functional collaboration, "
+            "and clear communication with technical and non-technical stakeholders"
         )
-        fallback_criteria = "- Demonstrated role-relevant delivery skills and clear communication"
 
-    tag_line = ", ".join(tags) if tags else "Stakeholder Communication, Execution, Problem Solving"
-    skills_line = ", ".join(key_skills) if key_skills else "problem solving, communication, and delivery excellence"
-    criteria_line = "\n".join([f"- {c}" for c in criteria[:4]]) if criteria else fallback_criteria
+    tag_line = ", ".join(tags[:4]) if tags else "collaboration, ownership, and continuous improvement"
+    skills_line = ", ".join(key_skills[:6]) if key_skills else "problem solving, communication, and delivery excellence"
+    reqs = [_clean_requirement_text(c) for c in criteria if _clean_requirement_text(c)]
+    if reqs:
+        if len(reqs) == 1:
+            requirements_prose = reqs[0]
+        elif len(reqs) == 2:
+            requirements_prose = f"{reqs[0]} and {reqs[1]}"
+        else:
+            requirements_prose = f"{reqs[0]}, {reqs[1]}, and {reqs[2]}"
+    else:
+        requirements_prose = "strong delivery ownership, practical problem-solving, and effective stakeholder communication"
 
     return (
         f"{name}\n"
@@ -444,18 +449,17 @@ def _build_cover_letter(row, candidate):
         f"[Company Address]\n\n"
         f"Subject: Application for {title}\n\n"
         f"Dear Hiring Manager,\n\n"
-        f"I am writing to express my interest in the {title} role. With {experience}, and {education}, "
-        f"I bring a practical and outcome-focused approach that aligns well with the responsibilities in your posting. "
-        f"Based in {location}, I am excited by the opportunity to contribute to your team and support high-quality delivery from day one.\n\n"
-        f"Across recent projects, I have applied key skills including {skills_line}. {profile_line} {tag_line}, "
-        f"which directly supports the needs highlighted in this role. {additional_notes}. {contribution_line}\n\n"
-        f"From your description, the highest-value criteria appear to be:\n"
-        f"{criteria_line}\n\n"
-        f"{impact_line} I am confident this combination of technical execution, collaboration, and ownership "
-        f"can help your team move efficiently from requirements to measurable outcomes. I also focus on clear documentation, "
-        f"proactive communication, and continuous improvement so stakeholders remain aligned throughout delivery.\n\n"
-        f"I would welcome a first screening phone call to discuss how my experience maps to your current needs and how "
-        f"I can support rapid onboarding into this position. Thank you for your consideration.\n\n"
+        f"I am pleased to apply for the {title} position. With {experience} and {education}, I have developed a practical, "
+        f"results-focused approach to delivering high-quality outcomes in dynamic environments. I am motivated by the opportunity "
+        f"to contribute in {location} and support your team with dependable execution, clear communication, and strong accountability from the outset.\n\n"
+        f"My recent work has required me to apply skills such as {skills_line}, while consistently balancing technical depth with business priorities. "
+        f"This experience has strengthened my ability to work across {tag_line} and align delivery with organizational goals. {additional_notes}. "
+        f"As reflected in your job description, the role emphasizes {requirements_prose}, and these are areas where I have demonstrated consistent performance.\n\n"
+        f"Beyond role fit, I would bring immediate value through {focus_phrase}. {impact_line}. I am comfortable taking ownership of complex tasks, "
+        f"collaborating across teams, and maintaining momentum from planning through execution. I also prioritize clean documentation and transparent updates "
+        f"so stakeholders can make timely, informed decisions throughout the project lifecycle.\n\n"
+        f"I would welcome the opportunity to discuss how my background aligns with your priorities and how I can contribute quickly in this role. "
+        f"Thank you for your time and consideration, and I look forward to the possibility of speaking with you.\n\n"
         f"Sincerely,\n"
         f"{name}"
     )
