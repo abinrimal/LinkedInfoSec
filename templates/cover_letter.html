@@ -130,10 +130,11 @@
       <div class="resume-section">
         <h3>Education</h3>
         <p>
-          <strong>Degree:</strong> {{ resume.education.degree }}<br>
-          <strong>Field:</strong> {{ resume.education.field }}<br>
-          <strong>Year:</strong> {{ resume.education.year }}<br>
-          <strong>Institution:</strong> {{ resume.education.institution }}
+          {% if resume.education.degree %}{{ resume.education.degree }}{% endif %}
+          {% if resume.education.field %}<br>{{ resume.education.field }}{% endif %}
+          {% if resume.education.year or resume.education.institution %}
+            <br>{% if resume.education.year %}{{ resume.education.year }}{% endif %}{% if resume.education.year and resume.education.institution %} | {% endif %}{% if resume.education.institution %}{{ resume.education.institution }}{% endif %}
+          {% endif %}
         </p>
       </div>
 
@@ -141,8 +142,8 @@
         <h3>Work Experience</h3>
         {% for exp in resume.work_experience %}
           <p>
-            <strong>{{ exp.title }}</strong> — {{ exp.company }}<br>
-            {{ exp.dates }} | {{ exp.location }} | {{ exp.employment_type }}
+            <strong>{{ exp.title }}</strong>{% if exp.company %} — {{ exp.company }}{% endif %}<br>
+            {% if exp.dates %}{{ exp.dates }}{% endif %}{% if exp.dates and exp.location %} | {% endif %}{% if exp.location %}{{ exp.location }}{% endif %}{% if (exp.dates or exp.location) and exp.employment_type %} | {% endif %}{% if exp.employment_type %}{{ exp.employment_type }}{% endif %}
           </p>
           <ul class="resume-list">
             {% for bullet in exp.bullets %}

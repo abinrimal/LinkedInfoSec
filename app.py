@@ -499,10 +499,10 @@ def _parse_education_details(education_text):
     """Parse education text into degree, field, year, institution."""
     text = " ".join((education_text or "").split()).strip()
     result = {
-        "degree": "As Provided",
-        "field": "As Provided",
-        "year": "As Provided",
-        "institution": "As Provided",
+        "degree": "",
+        "field": "",
+        "year": "",
+        "institution": "",
     }
     if not text:
         return result
@@ -579,10 +579,10 @@ def _parse_candidate_experience_entries(experience_text, target_role, location, 
                 if not isinstance(item, dict):
                     continue
                 title = str(item.get("title") or item.get("job_title") or target_role).strip()
-                company = str(item.get("company") or "As Provided").strip()
-                dates = str(item.get("dates") or "As Provided").strip()
-                loc = str(item.get("location") or location or "As Provided").strip()
-                emp_type = str(item.get("employment_type") or "As Provided").strip()
+                company = str(item.get("company") or "").strip()
+                dates = str(item.get("dates") or "").strip()
+                loc = str(item.get("location") or location or "").strip()
+                emp_type = str(item.get("employment_type") or "").strip()
 
                 responsibilities = item.get("responsibilities") or []
                 achievements = item.get("achievements") or []
@@ -642,10 +642,10 @@ def _parse_candidate_experience_entries(experience_text, target_role, location, 
     raw_points = [p.strip() for p in re.split(r",|;", text) if p.strip()]
     return [{
         "title": fallback_title,
-        "company": "As Provided",
-        "dates": "As Provided",
-        "location": location or "As Provided",
-        "employment_type": "As Provided",
+        "company": "",
+        "dates": "",
+        "location": location or "",
+        "employment_type": "",
         "bullets": _rewrite_experience_bullets(raw_points, req_summary, ats_keywords),
     }]
 
@@ -766,13 +766,21 @@ def _build_resume(row, candidate):
         ]
         skills = list(dict.fromkeys(matched_ats + profile_skills + ["Execution", "Stakeholder Communication", "Process Improvement"]))[:12]
 
-    notes_items = [n.strip() for n in additional_notes.split(",") if n.strip()]
+    notes_raw = [n.strip() for n in additional_notes.split(",") if n.strip()]
+    notes_items = []
+    for idx, n in enumerate(notes_raw[:3]):
+        keyword = matched_ats[idx % len(matched_ats)] if matched_ats else "role priorities"
+        notes_items.append(
+            f"Applied {n.lower()} to strengthen {keyword} outcomes and improve delivery consistency."
+        )
     if not notes_items:
-        notes_items = [additional_notes.strip()] if additional_notes.strip() else ["Strong ownership and collaborative working style"]
+        notes_items = [
+            "Demonstrated strong ownership and collaborative communication to support role priorities and delivery quality."
+        ]
 
     certs = re.findall(r"'([^']+)'", row.get("certs", "") or "")
     if certs:
-        notes_items.append("Certifications aligned to the role: " + ", ".join(certs[:5]))
+        notes_items.append("Relevant certifications include " + ", ".join(certs[:5]) + ".")
 
     experience_entries = _parse_candidate_experience_entries(exp_text, title, location, req_summary, matched_ats)
 
