@@ -153,3 +153,5 @@ python handle.py -f cyber_allinfo.csv
 ```bash
 python scrape.py -j "cybersecurity" -l "sydney" -q -o cyber -b chrome --keep-open
 ```
+
+# You can view the Application through python run app.py and execute logs and generate cover letters and custom APA style resumes now
